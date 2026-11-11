@@ -1,15 +1,10 @@
 import unittest
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
 
-from backend.models.case import CaseEntities
-from backend.services.population_intelligence import (
-    FAERSQueryResult,
-    assess_population_intelligence,
-    query_faers_event_count,
-)
+from backend.services.disproportionality import calculate_ror, classify_signal, data_confidence
+from backend.services.population_intelligence import openfda_total
 
 
 def api_response(status_code: int, payload: dict) -> httpx.Response:
@@ -21,62 +16,33 @@ def api_response(status_code: int, payload: dict) -> httpx.Response:
 
 
 class PopulationIntelligenceTests(unittest.TestCase):
-    @patch("backend.services.population_intelligence.httpx.get")
-    def test_successful_count(self, mock_get):
-        mock_get.return_value = api_response(
-            200, {"meta": {"results": {"total": 42}}}
-        )
+    def test_ror_and_signal_use_complete_two_by_two_table(self):
+        ror, lower, upper = calculate_ror(40, 1_000, 2_000, 100_000)
+        self.assertEqual((ror, lower, upper), (2.06, 1.5, 2.84))
+        self.assertEqual(classify_signal(40, ror, lower)[0], True)
 
-        result = query_faers_event_count("Drug", "Event")
+    def test_empty_cell_cannot_produce_ror(self):
+        self.assertEqual(calculate_ror(10, 10, 100, 1_000), (None, None, None))
 
-        self.assertEqual(result.count, 42)
-        self.assertEqual(result.status, "success")
-
-    @patch("backend.services.population_intelligence.httpx.get")
-    def test_no_matches_is_not_an_api_failure(self, mock_get):
-        mock_get.return_value = api_response(
-            404, {"error": {"message": "No matches found!"}}
-        )
-
-        result = query_faers_event_count("Drug", "Unknown event")
-
-        self.assertEqual(result.count, 0)
-        self.assertEqual(result.status, "no_results")
+    def test_confidence_is_based_on_pair_report_volume(self):
+        self.assertEqual(data_confidence(5), "Low")
+        self.assertEqual(data_confidence(20), "Moderate")
+        self.assertEqual(data_confidence(100), "High")
 
     @patch("backend.services.population_intelligence.httpx.get")
-    def test_api_failure_has_no_count(self, mock_get):
-        mock_get.return_value = api_response(
-            503, {"error": {"message": "Service unavailable"}}
-        )
+    def test_openfda_count_success(self, mock_get):
+        mock_get.return_value = api_response(200, {"meta": {"results": {"total": 42}}})
+        self.assertEqual(openfda_total("drug AND event"), 42)
 
-        result = query_faers_event_count("Drug", "Event")
+    @patch("backend.services.population_intelligence.httpx.get")
+    def test_openfda_no_matches_is_zero(self, mock_get):
+        mock_get.return_value = api_response(404, {"error": {"message": "No matches"}})
+        self.assertEqual(openfda_total("unknown"), 0)
 
-        self.assertIsNone(result.count)
-        self.assertEqual(result.status, "unavailable")
-
-    @patch("backend.services.population_intelligence.create_message")
-    @patch("backend.services.population_intelligence.query_faers_drug_total")
-    @patch("backend.services.population_intelligence.query_faers_event_count")
-    def test_openfda_failure_does_not_stop_assessment(
-        self, mock_event, mock_drug, mock_message
-    ):
-        unavailable = FAERSQueryResult(None, "unavailable", "OpenFDA unavailable")
-        mock_event.return_value = unavailable
-        mock_drug.return_value = unavailable
-        mock_message.return_value = SimpleNamespace(
-            content=[SimpleNamespace(type="text", text="Population context unavailable.\nUse case evidence.")]
-        )
-        entities = CaseEntities(
-            case_id="test-case",
-            suspect_product="TestDrug",
-            adverse_event="TestEvent",
-        )
-
-        result = assess_population_intelligence(entities, SimpleNamespace())
-
-        self.assertEqual(result.faers_signal.query_status, "unavailable")
-        self.assertIsNone(result.faers_signal.report_count)
-        self.assertIsNone(result.faers_signal.reporting_odds_ratio)
+    @patch("backend.services.population_intelligence.httpx.get")
+    def test_openfda_failure_is_unknown_not_zero(self, mock_get):
+        mock_get.return_value = api_response(503, {"error": {"message": "Unavailable"}})
+        self.assertEqual(openfda_total("drug AND event"), -1)
 
 
 if __name__ == "__main__":

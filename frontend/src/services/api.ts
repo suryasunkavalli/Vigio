@@ -28,10 +28,16 @@ export async function confirmBrief(
   caseId: string,
   reviewerName: string,
   reviewerDecision: string,
+  reviewerCausality?: string,
   reviewerNotes?: string
 ): Promise<void> {
   await api.post(`/confirm/${caseId}`, null, {
-    params: { reviewer_name: reviewerName, reviewer_decision: reviewerDecision, reviewer_notes: reviewerNotes }
+    params: {
+      reviewer_name: reviewerName,
+      reviewer_decision: reviewerDecision,
+      reviewer_causality: reviewerCausality,
+      reviewer_notes: reviewerNotes,
+    }
   })
 }
 

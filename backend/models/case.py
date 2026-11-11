@@ -1,9 +1,20 @@
-"""Pydantic models for case entities, intelligence layers, and the Case Intelligence Brief."""
+"""
+Pydantic models for case entities, the three safety lenses, and the Case Intelligence Brief.
+
+Vigio reads every ICSR through three analytical lenses (not sequential steps):
+  1. Regulatory Safety  - is the case valid, serious, listed/expected and reportable?
+  2. Clinical Safety    - what happened to the patient, and how plausible is a link to the product?
+  3. Population Safety & Evidence Generation - combined with other data, is there a risk worth investigating?
+
+The JSON keys `regulatory`, `clinical` and `population` are kept for API compatibility.
+"""
 
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 from enum import Enum
+
+from backend.config import PLATFORM_VERSION
 
 
 class Seriousness(str, Enum):
@@ -35,6 +46,16 @@ class Expectedness(str, Enum):
     UNKNOWN = "Unknown / Label Not Available"
 
 
+class CausalityCategory(str, Enum):
+    """WHO-UMC causality categories."""
+    CERTAIN = "Certain"
+    PROBABLE = "Probable / Likely"
+    POSSIBLE = "Possible"
+    UNLIKELY = "Unlikely"
+    CONDITIONAL = "Conditional / Unclassified"
+    UNASSESSABLE = "Unassessable / Unclassifiable"
+
+
 # --- Extracted Case Entities ---
 
 class CaseEntities(BaseModel):
@@ -51,8 +72,20 @@ class CaseEntities(BaseModel):
     suspect_product_dose: Optional[str] = None
     suspect_product_indication: Optional[str] = None
     adverse_event: Optional[str] = None
+    adverse_event_pt: Optional[str] = None       # MedDRA preferred term for the primary event, if identifiable
     adverse_event_onset: Optional[str] = None
     adverse_event_outcome: Optional[str] = None
+
+    # Clinical detail used by the Clinical Safety lens
+    therapy_start_date: Optional[str] = None
+    therapy_stop_date: Optional[str] = None
+    time_to_onset: Optional[str] = None          # e.g. "21 days after first dose"
+    dose_exposure: Optional[str] = None          # dose, frequency, route, duration, recent changes
+    dechallenge: Optional[str] = None            # Positive / Negative / Not done / Unknown, plus detail
+    rechallenge: Optional[str] = None            # Positive / Negative / Not done / Unknown, plus detail
+    medical_history: List[str] = []
+    concomitant_medications: List[str] = []
+    relevant_tests: List[str] = []               # labs, imaging, biopsies with values where stated
 
     # Validity
     four_element_valid: bool = False
@@ -62,7 +95,7 @@ class CaseEntities(BaseModel):
     source_narrative: str = ""
 
 
-# --- Layer 1: Regulatory Intelligence ---
+# --- Lens 1: Regulatory Safety ---
 
 class RegulatoryIntelligence(BaseModel):
     validity_status: ValidityStatus
@@ -71,6 +104,8 @@ class RegulatoryIntelligence(BaseModel):
     seriousness_criteria_met: List[str] = []
     expectedness: Expectedness
     expectedness_basis: str = ""
+    label_source: str = ""          # which reference label was used, or why none
+    reportability_causality: str = ""  # "reasonable possibility" assessment used for expedited reporting
     reporting_trigger: ReportingTrigger
     reporting_trigger_rationale: str = ""
     day_zero: Optional[str] = None  # date string
@@ -78,7 +113,7 @@ class RegulatoryIntelligence(BaseModel):
     citations: List[str] = []  # ICH E2A, 21 CFR 312.32, etc.
 
 
-# --- Layer 2: Clinical Intelligence ---
+# --- Lens 2: Clinical Safety ---
 
 class PubMedReference(BaseModel):
     pmid: str
@@ -90,7 +125,25 @@ class PubMedReference(BaseModel):
     url: str
 
 
+class CausalityAssessment(BaseModel):
+    method: str = "WHO-UMC"
+    category: CausalityCategory = CausalityCategory.UNASSESSABLE
+    rationale: str = ""
+    criteria: Dict[str, str] = {}   # e.g. temporal relationship, dechallenge, alternative causes
+    reviewer_must_confirm: bool = True
+
+
 class ClinicalIntelligence(BaseModel):
+    case_clinical_summary: str = ""
+    time_to_onset_assessment: str = ""
+    dose_exposure_assessment: str = ""
+    dechallenge_rechallenge_assessment: str = ""
+    risk_factors: List[str] = []
+    alternative_causes: List[str] = []
+    causality: CausalityAssessment = Field(default_factory=CausalityAssessment)
+    follow_up_questions: List[str] = []
+
+    # Literature and mechanism
     mechanistic_summary: str = ""
     pubmed_references: List[PubMedReference] = []
     label_cross_reference: str = ""
@@ -98,26 +151,47 @@ class ClinicalIntelligence(BaseModel):
     clinical_notes: str = ""
 
 
-# --- Layer 3: Population Intelligence ---
+# --- Lens 3: Population Safety & Evidence Generation ---
 
 class FAERSSignal(BaseModel):
     drug_name: str
     event_term: str
-    report_count: Optional[int] = None
-    total_drug_reports: Optional[int] = None
+    report_count: int                       # a: reports with this drug and this event
+    total_drug_reports: int                 # a + b: all reports for this drug
+    event_total_reports: int = 0            # a + c: all reports for this event, any drug
+    database_total_reports: int = 0         # N: all reports in FAERS
     reporting_odds_ratio: Optional[float] = None
+    ror_ci_lower: Optional[float] = None
+    ror_ci_upper: Optional[float] = None
+    is_sdr: bool = False                    # signal of disproportionate reporting
     signal_strength: str = ""
-    query_status: str = "success"  # success / no_results / partial / unavailable
-    query_note: str = ""
-    data_source: str = "FDA FAERS / OpenFDA"
+    data_confidence: str = ""               # High / Moderate / Low, by report volume
+    data_source: str = "FDA FAERS via openFDA"
+    data_period: str = ""                   # e.g. "2026Q3" for the local snapshot
+    match_notes: str = ""                   # how the drug and event were matched to FAERS terms
     query_timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+class SubgroupBreakdown(BaseModel):
+    by_sex: Dict[str, int] = {}
+    by_age_group: Dict[str, int] = {}
+    outcomes: Dict[str, int] = {}
+    note: str = "Counts of FAERS reports for this drug-event pair. Descriptive only; not adjusted rates."
+
+
+class EvidenceGap(BaseModel):
+    question: str
+    why_it_matters: str = ""
+    data_that_would_answer: str = ""   # e.g. claims, EHR, registry, targeted study
 
 
 class PopulationIntelligence(BaseModel):
     faers_signal: Optional[FAERSSignal] = None
+    subgroups: Optional[SubgroupBreakdown] = None
     background_context: str = ""
     population_notes: str = ""
     signal_summary: str = ""
+    evidence_gaps: List[EvidenceGap] = []
 
 
 # --- Case Intelligence Brief (the output) ---
@@ -134,6 +208,7 @@ class RecommendedAction(str, Enum):
 class HumanConfirmation(BaseModel):
     reviewer_name: Optional[str] = None
     reviewer_decision: Optional[str] = None
+    reviewer_causality: Optional[str] = None   # reviewer's own WHO-UMC category
     reviewer_notes: Optional[str] = None
     confirmed_at: Optional[datetime] = None
     override_reason: Optional[str] = None
@@ -143,12 +218,12 @@ class CaseIntelligenceBrief(BaseModel):
     brief_id: str
     case_id: str
     generated_at: datetime = Field(default_factory=datetime.utcnow)
-    platform_version: str = "Verix MVP 0.1"
+    platform_version: str = PLATFORM_VERSION
 
     # Extracted entities
     entities: CaseEntities
 
-    # Three layers
+    # Three lenses
     regulatory: RegulatoryIntelligence
     clinical: ClinicalIntelligence
     population: PopulationIntelligence

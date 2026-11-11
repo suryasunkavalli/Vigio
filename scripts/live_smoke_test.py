@@ -82,8 +82,9 @@ def main() -> None:
         print(f"case_id: {case_id}")
         print(f"source_filename: {brief['source_pdf_filename']}")
         print(f"validity: {brief['regulatory']['validity_status']}")
-        print(f"faers_status: {brief['population']['faers_signal']['query_status']}")
+        print(f"faers_source: {brief['population']['faers_signal']['data_source']}")
         print(f"faers_ror: {brief['population']['faers_signal']['reporting_odds_ratio']}")
+        print(f"faers_ci: {brief['population']['faers_signal']['ror_ci_lower']}-{brief['population']['faers_signal']['ror_ci_upper']}")
         print(f"recommended_action: {brief['recommended_action']}")
         print(f"export_bytes: {len(export.content)}")
 

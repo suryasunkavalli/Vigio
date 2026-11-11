@@ -14,6 +14,7 @@ from pathlib import Path
 from uuid import uuid4
 from datetime import datetime
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
@@ -38,7 +39,7 @@ from backend.services.anthropic_service import (
 )
 
 router = APIRouter()
-logger = logging.getLogger("verix.cases")
+logger = logging.getLogger("vigio.cases")
 
 # In-memory store for MVP (replace with DB in production)
 _briefs: dict[str, CaseIntelligenceBrief] = {}
@@ -105,17 +106,20 @@ def _run_analysis(case_id: str, filename: str):
         update("Extracting ICH E2A entities", 25)
         entities = extract_entities(narrative, case_id, client)
 
-        # Step 3: Regulatory intelligence (Layer 1)
-        update("Running Regulatory Intelligence (Layer 1)", 45)
-        regulatory = assess_regulatory_intelligence(entities, narrative, client)
+        # Regulatory and Clinical are independent views of the same extracted case.
+        update("Running Regulatory Safety and Clinical Safety lenses", 45)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            regulatory_future = pool.submit(
+                assess_regulatory_intelligence, entities, narrative, client
+            )
+            clinical_future = pool.submit(
+                assess_clinical_intelligence, entities, narrative, client
+            )
+            regulatory = regulatory_future.result()
+            clinical = clinical_future.result()
 
-        # Step 4: Clinical intelligence (Layer 2)
-        update("Running Clinical Intelligence — PubMed search (Layer 2)", 65)
-        clinical = assess_clinical_intelligence(entities, client)
-
-        # Step 5: Population intelligence (Layer 3)
-        update("Running Population Intelligence — FAERS query (Layer 3)", 80)
-        population = assess_population_intelligence(entities, client)
+        update("Running Population Safety & Evidence Generation lens", 75)
+        population = assess_population_intelligence(entities, client, clinical)
 
         # Step 6: Synthesize brief
         update("Synthesizing Case Intelligence Brief", 92)
@@ -226,6 +230,7 @@ def confirm_brief(
     case_id: str,
     reviewer_name: str,
     reviewer_decision: str,
+    reviewer_causality: Optional[str] = None,
     reviewer_notes: Optional[str] = None,
     override_reason: Optional[str] = None
 ):
@@ -240,6 +245,7 @@ def confirm_brief(
     brief.human_confirmation = HumanConfirmation(
         reviewer_name=reviewer_name,
         reviewer_decision=reviewer_decision,
+        reviewer_causality=reviewer_causality,
         reviewer_notes=reviewer_notes,
         confirmed_at=datetime.utcnow(),
         override_reason=override_reason
@@ -251,6 +257,8 @@ def confirm_brief(
         "timestamp": datetime.utcnow().isoformat(),
         "reviewer": reviewer_name,
         "decision": reviewer_decision,
+        "ai_causality": brief.clinical.causality.category.value,
+        "reviewer_causality": reviewer_causality,
         "notes": reviewer_notes,
         "override": override_reason is not None
     })
@@ -279,7 +287,7 @@ def export_brief(case_id: str, format: str = "json"):
     if format == "json":
         return JSONResponse(
             content=brief.model_dump(mode="json"),
-            headers={"Content-Disposition": f"attachment; filename=verix_brief_{case_id}.json"}
+            headers={"Content-Disposition": f"attachment; filename=vigio_brief_{case_id}.json"}
         )
 
     elif format == "e2b":
@@ -287,7 +295,7 @@ def export_brief(case_id: str, format: str = "json"):
         e = brief.entities
         r = brief.regulatory
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!-- Verix MVP — ICH E2B(R3) Export Stub -->
+<!-- Vigio MVP - ICH E2B(R3) Export Stub -->
 <!-- Case ID: {case_id} | Generated: {brief.generated_at.isoformat()} -->
 <ichicsr lang="en">
   <ichicsrmessageheader>
@@ -320,7 +328,7 @@ def export_brief(case_id: str, format: str = "json"):
         <drugindication>{e.suspect_product_indication or ""}</drugindication>
       </drug>
     </patient>
-    <!-- Verix AI recommended action: {brief.recommended_action.value} -->
+    <!-- Vigio AI recommended action: {brief.recommended_action.value} -->
     <!-- Human reviewer: {brief.human_confirmation.reviewer_name or "PENDING"} -->
     <!-- Human decision: {brief.human_confirmation.reviewer_decision or "PENDING"} -->
   </safetyreport>
@@ -328,7 +336,7 @@ def export_brief(case_id: str, format: str = "json"):
 
         return JSONResponse(
             content={"xml": xml, "note": "ICH E2B(R3) stub — review before submission to regulatory systems"},
-            headers={"Content-Disposition": f"attachment; filename=verix_e2b_{case_id}.json"}
+            headers={"Content-Disposition": f"attachment; filename=vigio_e2b_{case_id}.json"}
         )
 
     else:

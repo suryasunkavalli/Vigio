@@ -1,5 +1,5 @@
 """
-Verix MVP — FastAPI Application Entry Point
+Vigio MVP - FastAPI Application Entry Point
 Pharmacovigilance Case Intelligence Platform
 """
 
@@ -23,25 +23,25 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-logger = logging.getLogger("verix")
+logger = logging.getLogger("vigio")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Verix MVP starting up")
+    logger.info("Vigio MVP starting up")
     try:
         settings = get_anthropic_settings()
         logger.info("Anthropic configured with model %s", settings.model)
     except AnthropicConfigurationError as exc:
         logger.warning("Anthropic configuration incomplete: %s", exc)
     yield
-    logger.info("Verix MVP shutting down")
+    logger.info("Vigio MVP shutting down")
 
 
 app = FastAPI(
-    title="Verix Case Intelligence API",
+    title="Vigio Case Intelligence API",
     description="Three-layer pharmacovigilance intelligence platform",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan
 )
 
@@ -56,7 +56,9 @@ app.add_middleware(
 
 # Register routers
 from backend.routers.cases import router as cases_router
+from backend.routers.faers import router as faers_router
 app.include_router(cases_router, prefix="/api")
+app.include_router(faers_router, prefix="/api")
 
 
 @app.get("/health")
@@ -68,8 +70,8 @@ def health():
         anthropic_config = {"configured": False, "error": str(exc)}
     return {
         "status": "ok",
-        "service": "verix-mvp",
-        "version": "0.1.0",
+        "service": "vigio-mvp",
+        "version": "0.2.0",
         "anthropic": anthropic_config,
     }
 
@@ -81,7 +83,7 @@ def frontend():
     html_path = Path(__file__).parent.parent / "frontend" / "standalone.html"
     if html_path.exists():
         return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
-    return HTMLResponse(content="<h1>Verix</h1><p>Frontend not found. Place standalone.html in frontend/</p>", status_code=404)
+    return HTMLResponse(content="<h1>Vigio</h1><p>Frontend not found. Place standalone.html in frontend/</p>", status_code=404)
 
 
 if __name__ == "__main__":

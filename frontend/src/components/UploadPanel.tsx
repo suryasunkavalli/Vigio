@@ -32,7 +32,7 @@ export default function UploadPanel({ onCaseStarted }: Props) {
   return (
     <div style={styles.panel}>
       <div style={styles.header}>
-        <span style={styles.logo}>Verix</span>
+        <span style={styles.logo}>Vigio</span>
         <span style={styles.tagline}>Case Intelligence Platform</span>
       </div>
 
@@ -78,7 +78,7 @@ export default function UploadPanel({ onCaseStarted }: Props) {
           ))}
         </div>
         <p style={styles.disclaimer}>
-          <strong>Intelligence ≠ Determination.</strong> Verix builds the evidentiary brief.
+          <strong>Intelligence ≠ Determination.</strong> Vigio builds the evidentiary brief.
           A human reviewer makes the regulatory determination.
         </p>
       </div>

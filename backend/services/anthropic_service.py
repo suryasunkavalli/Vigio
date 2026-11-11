@@ -29,10 +29,7 @@ class AnthropicSettings:
 
 def get_anthropic_settings() -> AnthropicSettings:
     api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
-    model = (
-        os.getenv("ANTHROPIC_MODEL", "").strip()
-        or os.getenv("VERIX_MODEL", "").strip()
-    )
+    model = os.getenv("ANTHROPIC_MODEL", "").strip()
 
     if not api_key or api_key == "sk-ant-...":
         raise AnthropicConfigurationError(

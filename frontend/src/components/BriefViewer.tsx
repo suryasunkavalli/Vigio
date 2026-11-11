@@ -27,6 +27,7 @@ export default function BriefViewer({ brief, onConfirmed }: Props) {
   const [tab, setTab] = useState<'summary' | 'regulatory' | 'clinical' | 'population' | 'confirm'>('summary')
   const [reviewerName, setReviewerName] = useState('')
   const [decision, setDecision] = useState('')
+  const [causality, setCausality] = useState('')
   const [notes, setNotes] = useState('')
   const [confirming, setConfirming] = useState(false)
   const [confirmed, setConfirmed] = useState(!!brief.human_confirmation?.confirmed_at)
@@ -39,7 +40,7 @@ export default function BriefViewer({ brief, onConfirmed }: Props) {
     if (!reviewerName || !decision) return
     setConfirming(true)
     try {
-      await confirmBrief(brief.case_id, reviewerName, decision, notes)
+      await confirmBrief(brief.case_id, reviewerName, decision, causality || undefined, notes)
       setConfirmed(true)
       onConfirmed()
     } finally {
@@ -197,10 +198,9 @@ export default function BriefViewer({ brief, onConfirmed }: Props) {
                 {[
                   ['Drug', p.faers_signal.drug_name],
                   ['Event', p.faers_signal.event_term],
-                  ['FAERS Reports', p.faers_signal.report_count?.toLocaleString() ?? 'Unavailable'],
-                  ['Total Drug Reports', p.faers_signal.total_drug_reports?.toLocaleString() ?? 'Unavailable'],
-                  ['Query Status', p.faers_signal.query_status],
-                  ['ROR', 'Unavailable in MVP'],
+                  ['FAERS Reports', p.faers_signal.report_count.toLocaleString()],
+                  ['Signal Strength', p.faers_signal.signal_strength],
+                  ['ROR', p.faers_signal.reporting_odds_ratio?.toFixed(2) || 'N/A'],
                   ['Data Source', p.faers_signal.data_source],
                 ].map(([label, val]) => (
                   <div key={label} style={styles.card}>
@@ -210,7 +210,6 @@ export default function BriefViewer({ brief, onConfirmed }: Props) {
                 ))}
               </div>
             )}
-            {p.faers_signal?.query_note && <p style={styles.dimText}>{p.faers_signal.query_note}</p>}
             <h3 style={styles.sectionTitle}>Signal Summary</h3>
             <p style={styles.para}>{p.signal_summary}</p>
             {p.background_context && (
@@ -219,7 +218,7 @@ export default function BriefViewer({ brief, onConfirmed }: Props) {
             {p.population_notes && (
               <><h3 style={styles.sectionTitle}>Population Notes</h3><p style={styles.para}>{p.population_notes}</p></>
             )}
-            <p style={styles.disclaimer}>FAERS reports are voluntary, can contain duplicates, and cannot establish incidence or causality. ROR is not calculated in this MVP.</p>
+            <p style={styles.disclaimer}>FAERS data is voluntary and subject to reporting bias. ROR does not establish causality.</p>
           </div>
         )}
 
@@ -251,6 +250,16 @@ export default function BriefViewer({ brief, onConfirmed }: Props) {
                   <option>Obtain Follow-Up Information</option>
                   <option>No Regulatory Action Required</option>
                   <option>Senior Medical Review Required</option>
+                </select>
+                <label style={styles.label}>WHO-UMC Causality</label>
+                <select style={styles.input} value={causality} onChange={e => setCausality(e.target.value)}>
+                  <option value="">Not assessed</option>
+                  <option>Certain</option>
+                  <option>Probable / Likely</option>
+                  <option>Possible</option>
+                  <option>Unlikely</option>
+                  <option>Conditional / Unclassified</option>
+                  <option>Unassessable / Unclassifiable</option>
                 </select>
                 <label style={styles.label}>Notes / Rationale</label>
                 <textarea style={{ ...styles.input, height: 80, resize: 'vertical' }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any notes, overrides, or rationale for deviation from AI recommendation..." />
