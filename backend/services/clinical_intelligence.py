@@ -144,7 +144,7 @@ def assess_clinical_intelligence(
     logger.info(f"Running Clinical Safety lens for case {entities.case_id}")
 
     drug = entities.suspect_product or ""
-    event = entities.adverse_event or ""
+    event = entities.adverse_event_pt or entities.adverse_event or ""
 
     articles = fetch_pubmed_summaries(search_pubmed(build_pubmed_query(drug, event))) if drug and event else []
     logger.info(f"Found {len(articles)} PubMed articles for '{drug}' + '{event}'")

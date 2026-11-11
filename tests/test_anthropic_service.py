@@ -28,6 +28,13 @@ class AnthropicServiceTests(unittest.TestCase):
         data = parse_json_response(response_with('{"ok": true}'), "test")
         self.assertTrue(data["ok"])
 
+    def test_parses_json_wrapped_in_explanatory_text(self):
+        data = parse_json_response(
+            response_with('Here is the result:\n```json\n{"ok": true}\n```'),
+            "test",
+        )
+        self.assertTrue(data["ok"])
+
     def test_rejects_invalid_json(self):
         with self.assertRaises(AnthropicResponseError):
             parse_json_response(response_with("not JSON"), "test")

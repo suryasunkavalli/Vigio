@@ -173,7 +173,7 @@ def assess_population_intelligence(
     logger.info(f"Running Population Safety lens for case {entities.case_id}")
 
     drug = (entities.suspect_product or "").split()[0] if entities.suspect_product else ""
-    event = entities.adverse_event or ""
+    event = entities.adverse_event_pt or entities.adverse_event or ""
     if not drug or not event:
         return PopulationIntelligence(
             signal_summary="Insufficient case data to query FAERS.",
@@ -196,7 +196,7 @@ def assess_population_intelligence(
 
     response = create_message(
         client,
-        max_tokens=1500,
+        max_tokens=3000,
         system=POPULATION_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": f"Drug: {drug}\nEvent: {event}\n\nFAERS:\n{faers_text}\n{clinical_text}"}]
     )

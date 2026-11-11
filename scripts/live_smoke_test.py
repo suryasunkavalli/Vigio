@@ -1,6 +1,13 @@
 """Paid end-to-end smoke test using a fictional pharmacovigilance case."""
 
 import io
+import sys
+from pathlib import Path
+
+# Allow both `python scripts/live_smoke_test.py` and `python -m scripts.live_smoke_test`.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 import pymupdf
 from dotenv import load_dotenv

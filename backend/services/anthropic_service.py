@@ -101,7 +101,12 @@ def response_text(response: Any, operation: str) -> str:
 
 
 def parse_json_response(response: Any, operation: str) -> dict[str, Any]:
-    """Parse a JSON object from Claude without silently inventing fallback data."""
+    """Parse Claude's first JSON object without inventing fallback data.
+
+    Claude occasionally surrounds otherwise valid JSON with a short explanation or a
+    Markdown fence. ``raw_decode`` accepts that harmless wrapping while required-field
+    checks still reject incomplete structured output.
+    """
     raw = response_text(response, operation)
     if raw.startswith("```"):
         first_newline = raw.find("\n")
@@ -109,9 +114,19 @@ def parse_json_response(response: Any, operation: str) -> dict[str, Any]:
         if first_newline != -1 and closing_fence > first_newline:
             raw = raw[first_newline + 1:closing_fence].strip()
 
+    object_start = raw.find("{")
+    if object_start == -1:
+        raise AnthropicResponseError(
+            f"Anthropic returned no JSON object for {operation}; manual review is required."
+        )
+
     try:
-        data = json.loads(raw)
+        data, _ = json.JSONDecoder().raw_decode(raw[object_start:])
     except json.JSONDecodeError as exc:
+        if getattr(response, "stop_reason", None) == "max_tokens":
+            raise AnthropicResponseError(
+                f"Anthropic output was truncated for {operation}; increase its output limit."
+            ) from exc
         raise AnthropicResponseError(
             f"Anthropic returned invalid JSON for {operation}; manual review is required."
         ) from exc
