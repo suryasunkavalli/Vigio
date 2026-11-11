@@ -6,12 +6,14 @@ Layer 1: Regulatory Intelligence
 - Expectedness determination
 """
 
-import json
 import logging
 from anthropic import Anthropic
 from backend.models.case import (
     CaseEntities, RegulatoryIntelligence,
     Seriousness, ReportingTrigger, ValidityStatus, Expectedness
+)
+from backend.services.anthropic_service import (
+    create_message, parse_json_response, require_json_fields
 )
 
 logger = logging.getLogger(__name__)
@@ -83,25 +85,24 @@ Extracted Entities:
 - Onset: {entities.adverse_event_onset}
 - Outcome: {entities.adverse_event_outcome}"""
 
-    response = client.messages.create(
-        model="claude-opus-4-5",
+    response = create_message(
+        client,
         max_tokens=1500,
         system=REGULATORY_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": context}]
     )
 
-    raw = response.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    raw = raw.strip()
-
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as e:
-        logger.error(f"Regulatory JSON parse error: {e}")
-        data = {}
+    data = parse_json_response(response, "regulatory intelligence")
+    require_json_fields(
+        data,
+        {
+            "validity_status", "four_element_check", "seriousness",
+            "seriousness_criteria_met", "expectedness", "expectedness_basis",
+            "reporting_trigger", "reporting_trigger_rationale", "day_zero",
+            "regulatory_notes", "citations",
+        },
+        "regulatory intelligence",
+    )
 
     return RegulatoryIntelligence(
         validity_status=data.get("validity_status", ValidityStatus.INVALID),

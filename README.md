@@ -17,17 +17,29 @@ Three-layer pharmacovigilance AI. Upload a case report PDF, get a structured Cas
 
 ---
 
-## Quick start (2 commands)
+## Quick start
 
-```bash
-# 1. Backend
-cp .env.example .env        # add ANTHROPIC_API_KEY
-pip install -r requirements.txt --break-system-packages
-python -m backend.main      # runs on http://localhost:8000
-
-# 2. Frontend — open in browser (no npm/build step needed)
-open http://localhost:8000/ui
+```powershell
+# Windows PowerShell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
+
+Set both required values in `.env`:
+
+```dotenv
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-sonnet-5-5
+```
+
+Then start the backend:
+
+```powershell
+.\.venv\Scripts\python.exe -m backend.main
+```
+
+Open `http://localhost:8000/ui` in a browser.
 
 The frontend is a single self-contained HTML file served directly by the backend.
 No Node, no npm, no Vite. Just open the URL once the backend is running.
@@ -48,6 +60,7 @@ vigio-mvp/
 │   ├── routers/
 │   │   └── cases.py                     # /upload /analyze /brief /confirm /export
 │   └── services/
+│       ├── anthropic_service.py         # Shared model config + API/JSON validation
 │       ├── pdf_parser.py                # PyMuPDF text extraction
 │       ├── entity_extractor.py          # ICH E2A extraction (Claude)
 │       ├── regulatory_intelligence.py   # Layer 1 (Claude)
@@ -73,6 +86,7 @@ vigio-mvp/
 |--------|------|-------------|
 | `POST` | `/api/upload` | Upload PDF → returns `case_id` |
 | `POST` | `/api/analyze?case_id=` | Start intelligence pipeline |
+| `POST` | `/api/anthropic/check` | Verify API key and model access with a minimal paid request |
 | `GET`  | `/api/status/{case_id}` | Poll progress (0–100%) |
 | `GET`  | `/api/brief/{case_id}` | Retrieve completed brief |
 | `POST` | `/api/confirm/{case_id}` | Submit human reviewer determination |
@@ -81,13 +95,29 @@ vigio-mvp/
 
 ---
 
-## Data sources (all free, no API keys required)
+## Data sources
 
 | Source | What we use | Cost |
 |--------|-------------|------|
 | Anthropic Claude | Entity extraction, all three intelligence layers | API usage |
 | NCBI PubMed E-utilities | esearch + esummary for mechanistic literature | Free |
 | OpenFDA FAERS | Drug-event report counts, ROR calculation | Free |
+
+## Validation
+
+Run local response-validation tests:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+Run the paid end-to-end smoke test with fictional case data:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.live_smoke_test
+```
+
+The smoke test calls Anthropic four times and also queries PubMed and OpenFDA.
 
 ---
 

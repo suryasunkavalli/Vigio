@@ -6,10 +6,10 @@ Layer 3: Population Intelligence
 """
 
 import httpx
-import math
 import logging
 from anthropic import Anthropic
 from backend.models.case import CaseEntities, PopulationIntelligence, FAERSSignal
+from backend.services.anthropic_service import create_message, response_text
 
 logger = logging.getLogger(__name__)
 
@@ -141,15 +141,15 @@ Provide:
 
 Be factual. Do not overstate the signal. Note that FAERS data is voluntary, subject to reporting bias, and does not establish causality."""
 
-    response = client.messages.create(
-        model="claude-opus-4-5",
+    response = create_message(
+        client,
         max_tokens=800,
         messages=[
             {"role": "user", "content": prompt}
         ]
     )
 
-    synthesis = response.content[0].text.strip()
+    synthesis = response_text(response, "population intelligence")
 
     # Split into summary + notes
     lines = synthesis.split("\n")

@@ -3,7 +3,6 @@ Verix MVP — FastAPI Application Entry Point
 Pharmacovigilance Case Intelligence Platform
 """
 
-import os
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,6 +12,11 @@ from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
 
 load_dotenv()
+
+from backend.services.anthropic_service import (
+    AnthropicConfigurationError,
+    get_anthropic_settings,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -25,8 +29,11 @@ logger = logging.getLogger("verix")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Verix MVP starting up")
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        logger.warning("ANTHROPIC_API_KEY not set — analysis will fail")
+    try:
+        settings = get_anthropic_settings()
+        logger.info("Anthropic configured with model %s", settings.model)
+    except AnthropicConfigurationError as exc:
+        logger.warning("Anthropic configuration incomplete: %s", exc)
     yield
     logger.info("Verix MVP shutting down")
 
@@ -54,7 +61,17 @@ app.include_router(cases_router, prefix="/api")
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "verix-mvp", "version": "0.1.0"}
+    try:
+        settings = get_anthropic_settings()
+        anthropic_config = {"configured": True, "model": settings.model}
+    except AnthropicConfigurationError as exc:
+        anthropic_config = {"configured": False, "error": str(exc)}
+    return {
+        "status": "ok",
+        "service": "verix-mvp",
+        "version": "0.1.0",
+        "anthropic": anthropic_config,
+    }
 
 
 @app.get("/ui", response_class=HTMLResponse)

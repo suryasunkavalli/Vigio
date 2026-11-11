@@ -7,9 +7,11 @@ Layer 2: Clinical Intelligence
 
 import httpx
 import logging
-import json
 from anthropic import Anthropic
 from backend.models.case import CaseEntities, ClinicalIntelligence, PubMedReference
+from backend.services.anthropic_service import (
+    create_message, parse_json_response, require_json_fields
+)
 
 logger = logging.getLogger(__name__)
 
@@ -145,25 +147,22 @@ PubMed Search Results:
 
 Provide clinical intelligence assessment."""
 
-    response = client.messages.create(
-        model="claude-opus-4-5",
+    response = create_message(
+        client,
         max_tokens=1500,
         system=CLINICAL_SYNTHESIS_PROMPT,
         messages=[{"role": "user", "content": prompt}]
     )
 
-    raw = response.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    raw = raw.strip()
-
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as e:
-        logger.error(f"Clinical JSON parse error: {e}")
-        data = {}
+    data = parse_json_response(response, "clinical intelligence")
+    require_json_fields(
+        data,
+        {
+            "mechanistic_summary", "clinical_plausibility", "clinical_notes",
+            "label_cross_reference", "article_relevance",
+        },
+        "clinical intelligence",
+    )
 
     article_relevance = data.get("article_relevance", {})
 

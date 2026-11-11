@@ -14,6 +14,9 @@ from backend.models.case import (
     PopulationIntelligence, CaseIntelligenceBrief, HumanConfirmation,
     RecommendedAction, ReportingTrigger, ValidityStatus
 )
+from backend.services.anthropic_service import (
+    create_message, get_anthropic_model, parse_json_response, require_json_fields
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,25 +133,22 @@ CASE ENTITIES:
 
 Synthesize the Case Intelligence Brief now."""
 
-    response = client.messages.create(
-        model="claude-opus-4-5",
+    response = create_message(
+        client,
         max_tokens=1500,
         system=SYNTHESIS_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": context}]
     )
 
-    raw = response.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    raw = raw.strip()
-
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as e:
-        logger.error(f"Brief synthesis JSON parse error: {e}")
-        data = {}
+    data = parse_json_response(response, "brief synthesis")
+    require_json_fields(
+        data,
+        {
+            "executive_summary", "recommended_action",
+            "recommended_action_rationale", "key_uncertainties",
+        },
+        "brief synthesis",
+    )
 
     # Map recommended_action string to enum
     raw_action = data.get("recommended_action", "")
@@ -165,7 +165,7 @@ Synthesize the Case Intelligence Brief now."""
     audit_entry = {
         "event": "brief_generated",
         "timestamp": datetime.utcnow().isoformat(),
-        "model": "claude-opus-4-5",
+        "model": get_anthropic_model(),
         "layers_computed": ["regulatory", "clinical", "population"],
         "source_file": source_filename,
         "platform": "Verix MVP 0.1"

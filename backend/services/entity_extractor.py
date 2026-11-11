@@ -4,10 +4,12 @@ Uses Claude to extract the ICH E2A four elements and supporting case data
 from the raw case narrative text.
 """
 
-import json
 import logging
 from anthropic import Anthropic
 from backend.models.case import CaseEntities
+from backend.services.anthropic_service import (
+    create_message, parse_json_response, require_json_fields
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +51,8 @@ def extract_entities(narrative: str, case_id: str, client: Anthropic) -> CaseEnt
     """
     logger.info(f"Extracting entities for case {case_id}")
 
-    response = client.messages.create(
-        model="claude-opus-4-5",
+    response = create_message(
+        client,
         max_tokens=1024,
         system=EXTRACTION_SYSTEM_PROMPT,
         messages=[
@@ -61,20 +63,17 @@ def extract_entities(narrative: str, case_id: str, client: Anthropic) -> CaseEnt
         ]
     )
 
-    raw = response.content[0].text.strip()
-
-    # Strip markdown code fences if present
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    raw = raw.strip()
-
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse entity extraction JSON: {e}\nRaw: {raw}")
-        data = {}
+    data = parse_json_response(response, "entity extraction")
+    require_json_fields(
+        data,
+        {
+            "patient", "patient_age", "patient_sex", "reporter", "reporter_type",
+            "suspect_product", "suspect_product_dose", "suspect_product_indication",
+            "adverse_event", "adverse_event_onset", "adverse_event_outcome",
+            "four_element_valid", "missing_elements",
+        },
+        "entity extraction",
+    )
 
     return CaseEntities(
         case_id=case_id,

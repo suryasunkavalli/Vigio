@@ -8,9 +8,7 @@ POST /api/confirm/{id} — submit human reviewer confirmation
 GET  /api/export/{id}  — export brief as JSON or E2B stub
 """
 
-import os
 import time
-import json
 import logging
 from pathlib import Path
 from uuid import uuid4
@@ -18,8 +16,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse, FileResponse
-from anthropic import Anthropic
+from fastapi.responses import JSONResponse
 
 from backend.models.case import (
     CaseIntelligenceBrief, AnalysisStatus, HumanConfirmation
@@ -30,6 +27,15 @@ from backend.services.regulatory_intelligence import assess_regulatory_intellige
 from backend.services.clinical_intelligence import assess_clinical_intelligence
 from backend.services.population_intelligence import assess_population_intelligence
 from backend.services.brief_synthesizer import synthesize_brief
+from backend.services.anthropic_service import (
+    AnthropicConfigurationError,
+    AnthropicRequestError,
+    AnthropicResponseError,
+    check_anthropic_connection,
+    get_anthropic_client,
+    get_anthropic_model,
+    get_anthropic_settings,
+)
 
 router = APIRouter()
 logger = logging.getLogger("verix.cases")
@@ -37,16 +43,10 @@ logger = logging.getLogger("verix.cases")
 # In-memory store for MVP (replace with DB in production)
 _briefs: dict[str, CaseIntelligenceBrief] = {}
 _status: dict[str, AnalysisStatus] = {}
+_filenames: dict[str, str] = {}
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
-
-
-def get_anthropic_client() -> Anthropic:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
-    return Anthropic(api_key=api_key)
 
 
 # ─── Upload ─────────────────────────────────────────────────────────────────
@@ -54,7 +54,8 @@ def get_anthropic_client() -> Anthropic:
 @router.post("/upload")
 async def upload_case_pdf(file: UploadFile = File(...)):
     """Accept a PDF and return a case_id to track analysis."""
-    if not file.filename.lower().endswith(".pdf"):
+    filename = file.filename or "case.pdf"
+    if not filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files accepted")
 
     case_id = str(uuid4())
@@ -73,9 +74,10 @@ async def upload_case_pdf(file: UploadFile = File(...)):
 
     logger.info(f"Uploaded {file.filename} → case {case_id}")
 
+    _filenames[case_id] = filename
     return {
         "case_id": case_id,
-        "filename": file.filename,
+        "filename": filename,
         "message": "PDF uploaded. Call POST /api/analyze to begin intelligence extraction."
     }
 
@@ -86,8 +88,6 @@ def _run_analysis(case_id: str, filename: str):
     """Background task: run all three layers and synthesize brief."""
     start = time.time()
     pdf_path = str(UPLOAD_DIR / f"{case_id}.pdf")
-    client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-
     def update(step: str, pct: int):
         _status[case_id] = AnalysisStatus(
             case_id=case_id, status="processing", progress=pct, current_step=step
@@ -95,6 +95,8 @@ def _run_analysis(case_id: str, filename: str):
         logger.info(f"[{case_id}] {pct}% — {step}")
 
     try:
+        client = get_anthropic_client()
+
         # Step 1: PDF extraction
         update("Extracting text from PDF", 10)
         narrative = extract_and_clean(pdf_path)
@@ -154,17 +156,44 @@ async def analyze_case(case_id: str, background_tasks: BackgroundTasks):
     if case_id in _status and _status[case_id].status == "processing":
         raise HTTPException(status_code=409, detail="Analysis already in progress")
 
-    # Get original filename from status if available
-    filename = _status.get(case_id, AnalysisStatus(case_id=case_id, status="", current_step="")).current_step
-    filename = pdf_path.name  # use stored name as fallback
+    try:
+        get_anthropic_settings()
+    except AnthropicConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    background_tasks.add_task(_run_analysis, case_id, pdf_path.name)
+    filename = _filenames.get(case_id, pdf_path.name)
+    _status[case_id] = AnalysisStatus(
+        case_id=case_id,
+        status="processing",
+        progress=0,
+        current_step="Analysis queued",
+    )
+
+    background_tasks.add_task(_run_analysis, case_id, filename)
 
     return {
         "case_id": case_id,
         "status": "processing",
         "message": "Analysis started. Poll GET /api/status/{case_id} for progress."
     }
+
+
+@router.post("/anthropic/check")
+def check_anthropic():
+    """Verify the configured API key and model with a minimal paid request."""
+    try:
+        check_anthropic_connection()
+        return {
+            "status": "ok",
+            "model": get_anthropic_model(),
+            "message": "Anthropic credentials and model access verified.",
+        }
+    except (
+        AnthropicConfigurationError,
+        AnthropicRequestError,
+        AnthropicResponseError,
+    ) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 # ─── Status ─────────────────────────────────────────────────────────────────
