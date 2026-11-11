@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vigio — Case Intelligence Platform</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.5;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f1117; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    a { color: #60a5fa; }
+    a:hover { color: #93c5fd; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const { useState, useEffect, useRef } = React;
+
+/* ─── DEMO BRIEF DATA ──────────────────────────────────────────────────── */
+const DEMO_CASES = [
+  {
+    id: "demo-001",
+    label: "Warfarin",
+    event: "Intracranial Hemorrhage",
+    triggerLabel: "15-Day",
+    triggerColor: "#f59e0b",
+    brief: {
+      case_id: "DEMO-US-2024-00142",
+      source_pdf_filename: "case1_warfarin_intracranial_hemorrhage.pdf",
+      entities: {
+        patient: "J.M., 74-year-old male, 82 kg",
+        reporter: "Dr. Sarah Okonkwo, MD (Neurologist, Mount Sinai Hospital, New York, NY)",
+        reporter_type: "Physician",
+        suspect_product: "Warfarin sodium (Coumadin) 5 mg orally once daily — Bristol-Myers Squibb",
+        adverse_event: "Spontaneous intracranial hemorrhage (subarachnoid and subdural); MedDRA PT: Intracranial haemorrhage (10022506)",
+        four_element_valid: true,
+        missing_elements: []
+      },
+      regulatory: {
+        validity_status: "Valid (Four-Element Complete)",
+        seriousness: "Serious",
+        expectedness: "Labeled (Expected)",
+        reporting_trigger: "15-Day (Serious Unexpected)",
+        reporting_trigger_rationale: "Event meets seriousness threshold (life-threatening hospitalization with resulting disability). Hemorrhage is listed in the Coumadin US Prescribing Information; however, the specific presentation (subarachnoid extension with subdural hematoma at this severity, INR 4.8) may represent a more severe manifestation than labeled. Under 21 CFR 312.32, this constitutes a 15-day IND safety report. Day Zero is March 8, 2024 — date of initial clinical presentation to the emergency department.",
+        seriousness_criteria_met: [
+          "Life-threatening (INR 4.8, intracranial hemorrhage with midline shift)",
+          "Required hospitalization > 7 days (16-day admission, ICU)",
+          "Resulted in persistent significant disability (residual left-sided weakness MRC 3/5, dysarthria)"
+        ],
+        expectedness_basis: "Hemorrhage is listed as a known risk in the Coumadin (warfarin) US Prescribing Information, Warnings and Precautions section. The supratherapeutic INR (4.8) is a contributing factor consistent with the labeled mechanism. However, subarachnoid extension with subdural hematoma at this severity level warrants expedited review.",
+        day_zero: "2024-03-08 (date of emergency department presentation with first receipt of information constituting a valid ICSR)",
+        citations: [
+          "ICH E2A (1994) — Clinical Safety Data Management: Definitions and Standards for Expedited Reporting",
+          "21 CFR 312.32 — IND Safety Reporting",
+          "Coumadin (warfarin sodium) US Prescribing Information — Warnings and Precautions: Hemorrhage",
+          "FDA Guidance: Postmarketing Safety Reporting for Human Drug and Biological Products (2001)"
+        ],
+        regulatory_notes: "The supratherapeutic INR (4.8 vs. therapeutic range 2.0–3.0) should be investigated for root cause. Patient was on concomitant aspirin 81 mg — potential additive hemorrhagic risk. Permanent discontinuation of warfarin documented; transition to apixaban noted."
+      },
+      clinical: {
+        clinical_plausibility: "High",
+        mechanistic_summary: "Warfarin inhibits vitamin K-dependent synthesis of clotting factors II, VII, IX, and X, as well as anticoagulant proteins C and S. Supratherapeutic anticoagulation (INR 4.8) markedly increases the risk of spontaneous hemorrhage at any site. Intracranial hemorrhage is the most feared complication of warfarin therapy, occurring in approximately 0.3–0.6% of patients per year at therapeutic INR; risk increases exponentially with supratherapeutic values. The patient's age (74), prior stroke history, hypertension, and concomitant aspirin use represent established independent risk factors for anticoagulation-associated intracranial hemorrhage (HAS-BLED score estimated ≥4 — high risk).",
+        label_cross_reference: "Coumadin US PI (Warnings and Precautions): 'Bleeding is the most common adverse reaction to warfarin... Fatal and serious bleeding events including intracranial hemorrhage have been reported.' The PI specifically identifies age >65, hypertension, prior stroke, and concomitant antiplatelet therapy as risk factors. Supratherapeutic INR is a well-documented precipitant.",
+        pubmed_references: [
+          {
+            pmid: "28127399",
+            title: "Risk factors for intracranial hemorrhage in patients on warfarin: a systematic review and meta-analysis",
+            authors: "Fang MC, Go AS, Chang Y, et al.",
+            journal: "Stroke",
+            year: "2017",
+            relevance_summary: "Meta-analysis of 12 prospective cohorts (n=48,000) confirming INR >3.0, age, hypertension, and prior stroke as major independent risk factors for warfarin-associated intracranial hemorrhage. RR 4.6 for INR >3.5 vs. therapeutic range.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/28127399/"
+          },
+          {
+            pmid: "23709749",
+            title: "Reversal of warfarin anticoagulation with four-factor prothrombin complex concentrate in patients with intracranial hemorrhage",
+            authors: "Steiner T, Poli S, Griebe M, et al.",
+            journal: "Lancet Neurology",
+            year: "2016",
+            relevance_summary: "RCT demonstrating superiority of 4-factor PCC over FFP for INR reversal in warfarin-associated ICH. Supports the treatment approach used in this case (PCC + vitamin K IV). Median time to INR <1.3: 3.8 hours with PCC.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/23709749/"
+          },
+          {
+            pmid: "31475798",
+            title: "HAS-BLED score and prediction of major bleeding in patients with atrial fibrillation on warfarin",
+            authors: "Lip GYH, Frison L, Halperin JL, Lane DA",
+            journal: "Journal of the American College of Cardiology",
+            year: "2019",
+            relevance_summary: "Validation of HAS-BLED ≥3 as predictor of major bleeding requiring clinical intervention. Patient in this case scores ≥4 (hypertension, prior stroke, age 74, concomitant aspirin) placing him in the high-risk category where benefit-risk re-evaluation is warranted.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/31475798/"
+          }
+        ]
+      },
+      population: {
+        faers_signal: {
+          drug_name: "warfarin",
+          event_term: "intracranial haemorrhage",
+          report_count: 4821,
+          signal_strength: "Strong",
+          reporting_odds_ratio: 8.74,
+          data_source: "FDA FAERS (OpenFDA) — cumulative through Q4 2023"
+        },
+        signal_summary: "Warfarin-associated intracranial hemorrhage represents one of the strongest and most consistently observed signals in the FAERS database, with 4,821 cumulative reports and an ROR of 8.74 (95% CI 8.31–9.19). This is a well-characterized, class-defining safety signal for vitamin K antagonists.",
+        background_context: "Warfarin carries a known annual intracranial hemorrhage rate of 0.3–0.6% in AF patients at therapeutic anticoagulation. Risk escalates sharply with supratherapeutic INR, older age, hypertension, and concomitant antiplatelet use. The FAERS signal is consistent with decades of post-marketing surveillance and Phase IV data. Direct oral anticoagulants (DOACs) have largely replaced warfarin in AF indications precisely because of this risk profile.",
+        population_notes: "FAERS reports are voluntary and subject to underreporting and Weber effect bias. The observed ROR likely underestimates true risk in the elderly population, which is underrepresented in spontaneous reporting. The signal should be interpreted in the context of warfarin's known mechanism and extensive labeling."
+      },
+      executive_summary: "A 74-year-old male on warfarin for non-valvular atrial fibrillation presented with spontaneous intracranial hemorrhage (subdural + subarachnoid) in the setting of supratherapeutic anticoagulation (INR 4.8). The case meets all four ICH E2A validity elements. Seriousness criteria are satisfied on three grounds: life-threatening presentation, prolonged ICU hospitalization, and resulting significant disability. Clinical plausibility is high — the mechanistic link between supratherapeutic warfarin anticoagulation and intracranial hemorrhage is well-established and supported by strong FAERS signal (ROR 8.74, n=4,821). The event is labeled in the Coumadin PI; however, severity warrants 15-day expedited reporting. Warfarin has been permanently discontinued; patient transitioned to apixaban.",
+      recommended_action: "Submit 15-Day Expedited Report",
+      recommended_action_rationale: "Event is serious (life-threatening, hospitalization, disability) and while labeled as a class risk, the specific severity of presentation with supratherapeutic INR and multifocal hemorrhage constitutes an important labeled serious adverse event requiring expedited reporting under 21 CFR 312.32(c)(1)(i).",
+      key_uncertainties: [
+        "Root cause of INR elevation from 2.4 (3 weeks prior) to 4.8 at presentation not established — drug interaction, dietary change, or illness-related hepatic effect should be investigated",
+        "Contribution of concomitant aspirin 81 mg to hemorrhagic risk not quantifiable in this case",
+        "Whether this represents a more severe presentation than labeled (subarachnoid extension) requires medical review for expectedness determination"
+      ],
+      human_confirmation: null,
+      source_case: `INDIVIDUAL CASE SAFETY REPORT — INITIAL REPORT
+Received: March 12, 2024  |  Reporter Reference: MSH-2024-0308-NRL
+
+SECTION A — PATIENT INFORMATION
+Patient Initials: J.M.
+Age: 74 years  |  Sex: Male  |  Weight: 82 kg  |  Height: 178 cm
+Country of Occurrence: United States
+
+SECTION B — ADVERSE EVENT(S)
+Event Description (verbatim from reporter):
+"Patient presented to the emergency department on March 8, 2024 with sudden onset severe headache, confusion, and left-sided weakness. CT head demonstrated large subdural hematoma with subarachnoid extension and 6mm midline shift. INR on admission was 4.8. Patient was admitted to the neurological ICU. Neurosurgery was consulted — conservative management elected given age and comorbidities. IV Vitamin K and 4-factor PCC administered for INR reversal. Patient required 16-day hospitalization. At discharge, persistent left-sided weakness (MRC grade 3/5) and dysarthria noted. Warfarin permanently discontinued; apixaban initiated after 3-month washout pending neurology clearance."
+
+Onset Date: March 8, 2024
+Outcome: Recovering with sequelae (persistent neurological deficit)
+Serious: Yes
+Seriousness Criteria Reported: Life-threatening; Hospitalization (prolonged); Disability/Incapacity
+
+SECTION C — SUSPECT MEDICATION(S)
+Drug Name: Warfarin sodium (Coumadin®)
+Manufacturer: Bristol-Myers Squibb
+Dose: 5 mg orally once daily
+Indication: Non-valvular atrial fibrillation (stroke prophylaxis)
+Start Date: September 2019  |  Stop Date: March 8, 2024 (permanently discontinued)
+Action Taken: Drug withdrawn
+Concomitant Medications: Aspirin 81 mg daily, Lisinopril 10 mg daily, Atorvastatin 40 mg nightly, Metoprolol succinate 50 mg daily
+
+SECTION D — REPORTER INFORMATION
+Reporter Name: Dr. Sarah Okonkwo, MD
+Specialty: Neurology
+Institution: Mount Sinai Hospital, New York, NY 10029
+Phone: (212) 555-0182  |  Email: s.okonkwo@mountsinai.org
+Reporter Type: Physician (Healthcare Professional)
+Report Type: Spontaneous
+
+SECTION E — NARRATIVE
+Dr. Okonkwo reports a 74-year-old male with a history of non-valvular atrial fibrillation, hypertension, hyperlipidemia, and prior ischemic stroke (2021) who presented to the emergency department with acute onset severe headache, confusion, and left-sided hemiparesis. The patient had been on warfarin for stroke prophylaxis since 2019, with previously stable INR values in the therapeutic range (2.0–3.0). Last INR check three weeks prior was 2.4. On admission INR was supratherapeutic at 4.8. CT head without contrast demonstrated a large right-sided subdural hematoma (maximum thickness 12mm) with subarachnoid extension and 6mm leftward midline shift. Neurosurgery evaluated the patient and elected conservative management given age and bilateral comorbidities. Reversal therapy was initiated with 4-factor prothrombin complex concentrate (PCC) and intravenous vitamin K. The patient was admitted to the neurological ICU for monitoring. Over 16 days, the patient showed partial neurological recovery but was discharged with residual left-sided weakness (MRC grade 3/5) and dysarthria. Warfarin was permanently discontinued at discharge. Apixaban is planned after neurology clearance in 3 months. The reporter considers the event related to warfarin therapy in the setting of supratherapeutic anticoagulation.
+
+Reporter's Causality Assessment: Related
+Reporter Comments: "INR elevation cause unclear — possible interaction with recent amoxicillin course for URI 2 weeks prior."`,
+      audit_trail: [
+        {
+          action: "BRIEF_GENERATED",
+          timestamp: "2024-03-12T14:22:08Z",
+          actor: "Vigio AI Pipeline v0.1",
+          note: "Full three-layer intelligence brief generated from ICSR PDF. Processing time: 38.2s."
+        }
+      ]
+    }
+  },
+  {
+    id: "demo-002",
+    label: "Pembrolizumab",
+    event: "Immune-Mediated Myocarditis",
+    triggerLabel: "7-Day",
+    triggerColor: "#ef4444",
+    brief: {
+      case_id: "DEMO-US-2024-00389",
+      source_pdf_filename: "case2_pembrolizumab_myocarditis.pdf",
+      entities: {
+        patient: "R.T., 58-year-old female, 68 kg",
+        reporter: "Dr. Michael Chen, MD, PhD (Oncologist, Dana-Farber Cancer Institute, Boston, MA)",
+        reporter_type: "Physician",
+        suspect_product: "Pembrolizumab (Keytruda) 200 mg IV every 3 weeks — Merck Sharp & Dohme LLC",
+        adverse_event: "Immune-mediated myocarditis with cardiogenic shock, CTCAE Grade 4; MedDRA PT: Myocarditis (10028606)",
+        four_element_valid: true,
+        missing_elements: []
+      },
+      regulatory: {
+        validity_status: "Valid (Four-Element Complete)",
+        seriousness: "Serious",
+        expectedness: "Labeled (Expected)",
+        reporting_trigger: "7-Day (Fatal/Life-Threatening Unexpected)",
+        reporting_trigger_rationale: "The event meets the life-threatening threshold under 21 CFR 312.32: LVEF dropped to 18% with cardiogenic shock requiring ICU admission. Although myocarditis is listed in the Keytruda US Prescribing Information (Section 5.2), a Grade 4 immune-mediated myocarditis with cardiogenic shock represents the most severe manifestation and constitutes a life-threatening event triggering the 7-day expedited reporting clock. Day Zero is July 15, 2024 — date of ED presentation with confirmed cardiogenic shock.",
+        seriousness_criteria_met: [
+          "Life-threatening (LVEF 18%, cardiogenic shock, ICU admission)",
+          "Required hospitalization — cardiac ICU, 14-day admission",
+          "Medically significant — required high-dose IV corticosteroids, permanent drug discontinuation"
+        ],
+        expectedness_basis: "Immune-mediated myocarditis is listed in Keytruda US PI Section 5.2 (Immune-Mediated Myocarditis). However, Grade 4 presentation with cardiogenic shock and LVEF 18% represents the most severe end of the spectrum. The PI describes fatal cases; this non-fatal Grade 4 case with biopsy confirmation is within labeled expectations but triggers 7-day reporting due to life-threatening severity.",
+        day_zero: "2024-07-15 (date of ED presentation with confirmed cardiogenic hemodynamic compromise — first receipt of information meeting life-threatening serious AE threshold)",
+        citations: [
+          "ICH E2A (1994) — 7-day expedited reporting for life-threatening unexpected serious adverse reactions",
+          "21 CFR 312.32(c)(2) — IND Safety Reporting: life-threatening suspected adverse reaction",
+          "Keytruda (pembrolizumab) US Prescribing Information, Section 5.2 — Immune-Mediated Myocarditis",
+          "NCCN Guidelines — Management of Immunotherapy-Related Adverse Events (2024)"
+        ],
+        regulatory_notes: "Biopsy-confirmed CD8+ T-cell lymphocytic infiltration establishes immune-mediated causality with high confidence. Permanent discontinuation documented. High-dose corticosteroid treatment initiated per ASCO/NCCN guidelines for Grade ≥3 immune-mediated myocarditis. LVEF recovery to 52% at 6 weeks is a positive prognostic indicator."
+      },
+      clinical: {
+        clinical_plausibility: "Definite",
+        mechanistic_summary: "Pembrolizumab is a PD-1 inhibitor that blocks the programmed cell death protein 1 receptor, restoring T-cell anti-tumor activity. This same mechanism of immune checkpoint release can cause immune-related adverse events (irAEs) across multiple organ systems, including the myocardium. Cardiac irAEs are mediated by cytotoxic CD8+ T-cells and CD4+ T-cells that infiltrate myocardial tissue, likely through molecular mimicry between tumor neoantigens and cardiac self-antigens, or through direct release of cardiac autoantibodies (anti-troponin, anti-myosin). The biopsy in this case showing CD8+ predominance is the canonical histopathological signature of checkpoint inhibitor-associated myocarditis. Grade 4 myocarditis with rapid hemodynamic compromise (LVEF 18%) reflects fulminant immune-mediated injury.",
+        label_cross_reference: "Keytruda US PI Section 5.2: 'Immune-mediated myocarditis, including fatal cases, occurred in patients receiving KEYTRUDA... Grade 3-4 immune-mediated myocarditis occurred in 0.4% of patients. Withhold KEYTRUDA for Grade 2 and permanently discontinue for Grade 3 or 4 or recurrent Grade 2 immune-mediated myocarditis.' This case (Grade 4) meets the criterion for permanent discontinuation as implemented.",
+        pubmed_references: [
+          {
+            pmid: "30445923",
+            title: "Myocarditis in patients treated with immune checkpoint inhibitors: a systematic review and meta-analysis",
+            authors: "Moslehi JJ, Salem JE, Sosman JA, Lebrun-Vignes B, Johnson DB",
+            journal: "JAMA",
+            year: "2018",
+            relevance_summary: "Landmark analysis of 101 fatal ICI-associated myocarditis cases from FAERS and published literature. Established median onset at 34 days (range 5–155 days), predominance of CD8+ infiltrate on biopsy, and ~50% fatality rate in fulminant cases. Directly relevant to this case's biopsy findings and clinical course.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/30445923/"
+          },
+          {
+            pmid: "32187457",
+            title: "High-dose corticosteroids for the treatment of immune checkpoint inhibitor-associated myocarditis",
+            authors: "Mahmood SS, Fradley MG, Cohen JV, et al.",
+            journal: "Journal of Clinical Oncology",
+            year: "2020",
+            relevance_summary: "Retrospective cohort (n=35) demonstrating that high-dose corticosteroids (≥1 mg/kg/day methylprednisolone) initiated early are associated with LVEF recovery in immune-mediated myocarditis. Patients with complete LVEF recovery had better long-term outcomes. Supports the treatment approach documented in this case.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/32187457/"
+          },
+          {
+            pmid: "34597489",
+            title: "Cardiovascular toxicities of immune checkpoint inhibitors: JACC review topic of the week",
+            authors: "Herrmann J, Lenihan D, Armenian S, et al.",
+            journal: "Journal of the American College of Cardiology",
+            year: "2022",
+            relevance_summary: "Comprehensive review of ICI cardiotoxicity mechanisms, risk factors, and management. Identifies combination immunotherapy (PD-1 + CTLA-4) as highest risk; single-agent PD-1 inhibitor myocarditis incidence ~0.5–1.0%. Troponin monitoring recommended as early biomarker.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/34597489/"
+          }
+        ]
+      },
+      population: {
+        faers_signal: {
+          drug_name: "pembrolizumab",
+          event_term: "myocarditis",
+          report_count: 1247,
+          signal_strength: "Strong",
+          reporting_odds_ratio: 22.4,
+          data_source: "FDA FAERS (OpenFDA) — cumulative through Q4 2023"
+        },
+        signal_summary: "Pembrolizumab-associated myocarditis demonstrates one of the strongest disproportionality signals among all PD-1 inhibitors in FAERS (ROR 22.4, n=1,247 reports). The signal is consistent across multiple approved indications and has been documented in regulatory communications and label updates. This is a class effect observed across all checkpoint inhibitors.",
+        background_context: "Immune-mediated myocarditis is a rare but potentially fatal complication of PD-1/PD-L1 inhibitors, with an incidence of approximately 0.5–1.5% across indications. Despite low absolute incidence, myocarditis carries the highest case fatality rate (~25–50% in fulminant presentations) of all cardiac irAEs. The FDA has included immune-mediated myocarditis as a Warnings and Precautions item for all approved checkpoint inhibitors. Post-marketing surveillance has identified combination immunotherapy regimens (PD-1 + CTLA-4) as carrying the highest risk.",
+        population_notes: "Cardiac irAEs are subject to significant underreporting in FAERS due to diagnostic complexity and attribution challenges (tumor progression vs. irAE). The true incidence likely exceeds FAERS-derived estimates. Troponin elevation as an early biomarker of subclinical myocarditis is increasingly recognized in prospective surveillance programs."
+      },
+      executive_summary: "A 58-year-old female with stage IIIB NSCLC developed Grade 4 immune-mediated myocarditis with cardiogenic shock (LVEF 18%) after 5 cycles of pembrolizumab-based chemotherapy. All four ICH E2A validity elements are satisfied. The event is life-threatening (LVEF 18%, cardiogenic shock, ICU), meeting the 7-day expedited reporting threshold under 21 CFR 312.32. Biopsy-confirmed CD8+ T-cell lymphocytic infiltration provides definitive mechanistic evidence of immune-mediated causality. The FAERS signal for pembrolizumab-myocarditis is among the strongest in the database (ROR 22.4). Pembrolizumab permanently discontinued; LVEF recovering to 52% at 6-week follow-up with corticosteroid treatment. This case warrants immediate 7-day IND safety report submission.",
+      recommended_action: "Submit 7-Day Expedited Report",
+      recommended_action_rationale: "Grade 4 immune-mediated myocarditis with cardiogenic shock (LVEF 18%) is a life-threatening event meeting the 7-day reporting threshold under 21 CFR 312.32(c)(2). Biopsy-confirmed immune causality, ICU admission, and permanent drug discontinuation support urgent regulatory notification.",
+      key_uncertainties: [
+        "Exact onset date of myocardial injury relative to Cycle 5 infusion — patient noted symptoms ~5 days post-infusion; subclinical troponin elevation may have preceded this",
+        "Whether prior cycles produced subclinical myocardial inflammation not captured by baseline troponin monitoring",
+        "Long-term LVEF trajectory and risk of recurrence if oncologic therapy requires rechallenge with alternative checkpoint inhibitor"
+      ],
+      human_confirmation: null,
+      source_case: `INDIVIDUAL CASE SAFETY REPORT — INITIAL REPORT
+Received: July 22, 2024  |  Reporter Reference: DFCI-2024-0715-ONC
+
+SECTION A — PATIENT INFORMATION
+Patient Initials: R.T.
+Age: 58 years  |  Sex: Female  |  Weight: 68 kg  |  Height: 165 cm
+Country of Occurrence: United States
+
+SECTION B — ADVERSE EVENT(S)
+Event Description (verbatim from reporter):
+"Patient developed acute onset dyspnea, chest pain, and palpitations on July 15, 2024, approximately 3 days after her 5th cycle of pembrolizumab. She was brought to the ED where ECG showed new ST changes and troponin I was markedly elevated at 18.4 ng/mL. Echo demonstrated LVEF of 18% with diffuse wall motion abnormalities. She was admitted to the cardiac ICU with cardiogenic shock requiring vasopressor support. Cardiac MRI confirmed myocarditis pattern with late gadolinium enhancement. Endomyocardial biopsy showed CD8+ T-cell lymphocytic infiltration consistent with immune-mediated myocarditis. High-dose methylprednisolone 1g IV daily initiated. Pembrolizumab permanently discontinued. LVEF improved to 52% at 6-week follow-up."
+
+Onset Date: July 15, 2024
+Outcome: Recovering
+Serious: Yes
+Seriousness Criteria Reported: Life-threatening; Hospitalization; Medically significant
+
+SECTION C — SUSPECT MEDICATION(S)
+Drug Name: Pembrolizumab (Keytruda®)
+Manufacturer: Merck Sharp & Dohme LLC
+Dose: 200 mg IV every 3 weeks
+Indication: Stage IIIB non-small cell lung cancer (NSCLC), 1L combination with carboplatin/pemetrexed
+Cycle Number at Onset: Cycle 5 (Day 1 of cycle 5: July 12, 2024)
+Start Date: March 4, 2024  |  Stop Date: July 15, 2024 (permanently discontinued)
+Action Taken: Drug withdrawn permanently
+Concomitant Medications: Carboplatin AUC5 IV q3w, Pemetrexed 500 mg/m² IV q3w, Ondansetron 8 mg PRN, Dexamethasone 4 mg (premedication), Omeprazole 20 mg daily
+
+SECTION D — REPORTER INFORMATION
+Reporter Name: Dr. Michael Chen, MD, PhD
+Specialty: Oncology (Thoracic)
+Institution: Dana-Farber Cancer Institute, Boston, MA 02215
+Phone: (617) 555-0247  |  Email: m.chen@dfci.harvard.edu
+Reporter Type: Physician (Healthcare Professional)
+Report Type: Spontaneous
+
+SECTION E — NARRATIVE
+Dr. Chen reports a 58-year-old female with stage IIIB NSCLC receiving first-line pembrolizumab in combination with carboplatin and pemetrexed per KEYNOTE-189 protocol. After tolerating four prior cycles without significant toxicity, she presented to the emergency department on Day 3 post-Cycle 5 with acute dyspnea, chest tightness, and palpitations. Vital signs on presentation: BP 88/54 mmHg, HR 118 bpm, SpO2 91% on room air. ECG demonstrated diffuse ST elevation. Troponin I 18.4 ng/mL (ULN 0.04 ng/mL). BNP 1,840 pg/mL. Bedside echo showed severely reduced LVEF of 18% with global hypokinesis. Patient was transferred to cardiac ICU and started on vasopressor support (norepinephrine). Cardiac MRI performed on Day 2 of admission confirmed myocarditis pattern with diffuse late gadolinium enhancement. Endomyocardial biopsy on Day 3: CD8+ T-lymphocyte predominant infiltrate with myocyte necrosis — consistent with immune checkpoint inhibitor-associated myocarditis. High-dose IV methylprednisolone 1g daily initiated for 3 days, then tapered. Vasopressor support weaned by Day 5. Patient discharged Day 14 with LVEF 35%. At 6-week cardiology follow-up, LVEF recovered to 52%. Pembrolizumab permanently discontinued; oncology team evaluating alternative regimens. Reporter classifies event as definitely related to pembrolizumab.
+
+Reporter's Causality Assessment: Definite
+Reporter Comments: "Biopsy-confirmed immune-mediated myocarditis. Classic presentation of checkpoint inhibitor cardiotoxicity. Would recommend urgent safety reporting."`,
+      audit_trail: [
+        {
+          action: "BRIEF_GENERATED",
+          timestamp: "2024-07-22T09:14:37Z",
+          actor: "Vigio AI Pipeline v0.1",
+          note: "Full three-layer intelligence brief generated from ICSR PDF. Processing time: 41.7s."
+        }
+      ]
+    }
+  },
+  {
+    id: "demo-003",
+    label: "Metformin",
+    event: "Lactic Acidosis",
+    triggerLabel: "15-Day",
+    triggerColor: "#f59e0b",
+    brief: {
+      case_id: "DEMO-US-2024-00671",
+      source_pdf_filename: "case3_metformin_lactic_acidosis.pdf",
+      entities: {
+        patient: "D.K., 67-year-old male, 91 kg",
+        reporter: "Emergency Physician (name withheld per facility policy)",
+        reporter_type: "Healthcare Professional",
+        suspect_product: "Metformin hydrochloride (Glucophage) 1000 mg orally twice daily — Mylan Pharmaceuticals (generic)",
+        adverse_event: "Severe lactic acidosis (lactate 14.2 mmol/L, pH 6.98), requiring hemodialysis; MedDRA PT: Lactic acidosis (10023676)",
+        four_element_valid: true,
+        missing_elements: []
+      },
+      regulatory: {
+        validity_status: "Valid (Four-Element Complete)",
+        seriousness: "Serious",
+        expectedness: "Labeled (Expected — Boxed Warning)",
+        reporting_trigger: "15-Day (Serious Unexpected)",
+        reporting_trigger_rationale: "Metformin-associated lactic acidosis (MALA) is a Boxed Warning in the metformin US Prescribing Information and therefore constitutes a labeled serious adverse event. Under ICH E2A and 21 CFR 312.32, labeled serious events are reportable as 15-day IND safety reports. While labeled, the clinical context — documented CKD stage 3b (eGFR 32) with no re-evaluation of metformin appropriateness and no dose adjustment over 8 months — constitutes a potential system-level safety signal warranting regulatory notification. Day Zero: September 2, 2024.",
+        seriousness_criteria_met: [
+          "Life-threatening (arterial pH 6.98, lactate 14.2 mmol/L, hemodynamic instability)",
+          "Required hospitalization — ICU admission, 8-day stay",
+          "Required hemodialysis intervention (3 sessions) for metformin removal and AKI management"
+        ],
+        expectedness_basis: "Lactic acidosis is the subject of a Boxed Warning in all metformin US Prescribing Information. The PI states: 'Lactic acidosis is a rare but serious metabolic complication that can occur due to metformin accumulation.' The PI contraindicates use at eGFR <30 and requires benefit-risk assessment at eGFR 30–45 with close monitoring. The patient's eGFR of 32 mL/min/1.73m² 8 months prior placed him in the zone requiring re-evaluation; no documentation of this review was noted, representing a potential prescribing/monitoring failure.",
+        day_zero: "2024-09-02 (date of emergency department presentation — first receipt of information constituting a valid ICSR with confirmed lactic acidosis diagnosis)",
+        citations: [
+          "ICH E2A (1994) — 15-day expedited reporting for labeled serious adverse reactions",
+          "21 CFR 312.32(c)(1)(i) — IND Safety Reporting: serious and unexpected suspected adverse reaction",
+          "Metformin HCl US Prescribing Information — BOXED WARNING: Lactic Acidosis",
+          "FDA Drug Safety Communication: Updated warnings for metformin regarding use in patients with reduced kidney function (April 2016)"
+        ],
+        regulatory_notes: "The 2016 FDA Drug Safety Communication updated metformin labeling to allow use down to eGFR 30 (previously contraindicated at <60) but with mandatory monitoring. This case highlights a potential monitoring failure — eGFR was 32 eight months prior with no documented re-evaluation. The acute dehydrating illness precipitating AKI (eGFR likely fell below 30 during the illness) created the conditions for metformin accumulation. This pattern (CKD + precipitating event + no monitoring) may represent a reportable safety signal for risk management purposes."
+      },
+      clinical: {
+        clinical_plausibility: "High",
+        mechanistic_summary: "Metformin inhibits mitochondrial complex I (NADH dehydrogenase) in hepatocytes, reducing hepatic glucose production. This mechanism also impairs aerobic respiration, shifting cellular metabolism toward anaerobic glycolysis and increasing lactate production. Simultaneously, metformin inhibits hepatic lactate uptake and gluconeogenesis from lactate. In normal renal function, metformin is renally eliminated unchanged (half-life ~6.2 hours); accumulation occurs when GFR falls below the elimination threshold. In this patient, pre-existing CKD (eGFR 32) combined with acute-on-chronic kidney injury from dehydration caused metformin accumulation to toxic serum levels (28 mcg/mL; toxic threshold ~5 mcg/mL in context of acidosis), resulting in severe mitochondrial inhibition, profound lactic acidosis (type B), and hemodynamic compromise.",
+        label_cross_reference: "Metformin HCl Boxed Warning: 'Metformin-associated lactic acidosis: Metformin-associated lactic acidosis has resulted in death, hypothermia, hypotension, and resistant bradyarrhythmias. The onset is often subtle... Renal impairment, concomitant use of certain drugs... increase the risk.' The PI specifically identifies renal impairment as the primary risk factor, consistent with this case. eGFR guidance: 'Obtain eGFR prior to initiation and at least annually thereafter... Consider more frequent monitoring in patients at risk for renal impairment.'",
+        pubmed_references: [
+          {
+            pmid: "29529060",
+            title: "Metformin-associated lactic acidosis: current perspectives on causes and risk factors",
+            authors: "Lazaridis D, Anastasiou IA, Koliaki C, et al.",
+            journal: "Therapeutics and Clinical Risk Management",
+            year: "2018",
+            relevance_summary: "Systematic review of MALA cases (n=347) identifying CKD (eGFR <45), acute kidney injury, and dehydration as the three most common precipitating factors. Median serum metformin at presentation: 26 mcg/mL. Hemodialysis associated with 70% reduction in mortality vs. supportive care alone. Highly relevant to this case profile.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/29529060/"
+          },
+          {
+            pmid: "26148375",
+            title: "FDA Drug Safety Communication: FDA revises warnings regarding use of the diabetes medicine metformin in certain patients with reduced kidney function",
+            authors: "US Food and Drug Administration",
+            journal: "FDA Safety Communication",
+            year: "2016",
+            relevance_summary: "Regulatory update allowing metformin use down to eGFR 30 with monitoring requirements. This communication explicitly states eGFR monitoring should occur 'before starting metformin and periodically thereafter' in patients with CKD, and that metformin should be withheld during illness that may cause dehydration.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/26148375/"
+          },
+          {
+            pmid: "35264817",
+            title: "Hemodialysis for metformin-associated lactic acidosis: systematic review and meta-analysis",
+            authors: "Nguyen HL, Nguyen TT, Nguyen DT, Nguyen QH",
+            journal: "Clinical Kidney Journal",
+            year: "2022",
+            relevance_summary: "Meta-analysis (n=289 MALA cases) demonstrating that early hemodialysis initiation (within 6 hours of diagnosis) is associated with significantly lower mortality and faster lactate normalization. Mean metformin clearance by hemodialysis: 170 mL/min. Supports the clinical decision to initiate emergent hemodialysis in this case.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/35264817/"
+          }
+        ]
+      },
+      population: {
+        faers_signal: {
+          drug_name: "metformin",
+          event_term: "lactic acidosis",
+          report_count: 2183,
+          signal_strength: "Strong",
+          reporting_odds_ratio: 11.2,
+          data_source: "FDA FAERS (OpenFDA) — cumulative through Q4 2023"
+        },
+        signal_summary: "Metformin-associated lactic acidosis is a well-characterized, strongly signaled event in FAERS (ROR 11.2, n=2,183 reports). The signal has been stable and persistent since metformin's US approval and is the basis for the Boxed Warning. FAERS reports show a clustering pattern in patients with CKD, acute illness, and radiographic contrast exposure — consistent with this case.",
+        background_context: "MALA incidence is estimated at 3–10 cases per 100,000 patient-years at therapeutic doses in patients with normal renal function. In patients with CKD (eGFR 30–45), incidence increases approximately 5-fold. The 2016 FDA labeling update extended metformin use to lower eGFR thresholds based on epidemiologic data suggesting lower risk than historically assumed, but this was conditional on regular monitoring — the gap highlighted by this case. Mortality in confirmed MALA treated with hemodialysis is approximately 15–25%; without dialysis, mortality approaches 50%.",
+        population_notes: "FAERS reports for MALA likely represent significant underreporting, as the diagnosis requires arterial lactate measurement and clinical suspicion — many cases may be attributed to AKI or sepsis without full workup. The true population-level incidence in patients with CKD who continue metformin without adequate monitoring may be substantially higher than published estimates."
+      },
+      executive_summary: "A 67-year-old male with CKD stage 3b (eGFR 32, not re-evaluated in 8 months) on long-term metformin 1000 mg BID developed life-threatening lactic acidosis (lactate 14.2 mmol/L, pH 6.98, serum metformin 28 mcg/mL) precipitated by acute dehydrating illness. All four ICH E2A validity elements are complete. The event satisfies three seriousness criteria: life-threatening, ICU hospitalization, and requirement for emergent hemodialysis. MALA is a Boxed Warning in the metformin PI, making this a labeled serious event requiring 15-day reporting. The clinical context raises a system-level signal: absence of documented renal monitoring per the 2016 FDA safety communication requirements. Strong FAERS signal (ROR 11.2, n=2,183). Patient survived; metformin permanently discontinued.",
+      recommended_action: "Submit 15-Day Expedited Report",
+      recommended_action_rationale: "Life-threatening MALA meets seriousness criteria under 21 CFR 312.32. The Boxed Warning status makes this a labeled serious AE requiring 15-day IND safety reporting. Additionally, the documented monitoring failure (no eGFR re-evaluation for 8 months in CKD patient) may constitute a signal for risk management assessment and potential prescribing practice communication.",
+      key_uncertainties: [
+        "Actual eGFR at time of acute dehydrating illness unknown — likely fell below the metformin contraindication threshold of 30 mL/min/1.73m² during illness",
+        "Whether the prescribing institution failed to implement the 2016 FDA monitoring requirements (annual eGFR checks, sick-day guidance) — potential system-level quality/safety signal",
+        "Contribution of COPD and possible tissue hypoxia to baseline lactate elevation as a predisposing factor"
+      ],
+      human_confirmation: null,
+      source_case: `INDIVIDUAL CASE SAFETY REPORT — INITIAL REPORT
+Received: September 4, 2024  |  Reporter Reference: UMMC-2024-0831-MED
+
+SECTION A — PATIENT INFORMATION
+Patient Initials: H.K.
+Age: 67 years  |  Sex: Male  |  Weight: 94 kg  |  Height: 172 cm
+Country of Occurrence: United States
+
+SECTION B — ADVERSE EVENT(S)
+Event Description (verbatim from reporter):
+"Patient with type 2 diabetes on metformin presented to the ED on August 31, 2024 with 2-day history of nausea, vomiting, abdominal pain, and increasing confusion. He had been started on IV contrast for a CT scan 4 days prior and metformin was not held. Arterial blood gas showed severe metabolic acidosis: pH 6.98, lactate 14.2 mmol/L. Serum creatinine 3.8 mg/dL (baseline 1.1 mg/dL). Metformin level: 28 mcg/mL (toxic range >5 mcg/mL). Diagnosis: metformin-associated lactic acidosis (MALA) secondary to acute kidney injury from contrast nephropathy. Patient required ICU admission and emergent hemodialysis. Metformin permanently discontinued. Patient recovered over 8 days."
+
+Onset Date: August 31, 2024
+Outcome: Recovered
+Serious: Yes
+Seriousness Criteria Reported: Life-threatening; Hospitalization (ICU)
+
+SECTION C — SUSPECT MEDICATION(S)
+Drug Name: Metformin hydrochloride (Glucophage XR®)
+Manufacturer: Bristol-Myers Squibb
+Dose: 1000 mg orally twice daily
+Indication: Type 2 diabetes mellitus (glycemic control)
+Start Date: February 2018  |  Stop Date: August 31, 2024 (permanently discontinued)
+Action Taken: Drug withdrawn
+Concomitant Medications: Iohexol 350 mg/mL IV (contrast agent, administered August 27, 2024), Lisinopril 20 mg daily, Furosemide 40 mg daily, Amlodipine 10 mg daily, Insulin glargine 20 units nightly
+
+SECTION D — REPORTER INFORMATION
+Reporter Name: Dr. Patricia Nguyen, MD
+Specialty: Internal Medicine / Nephrology
+Institution: University of Michigan Medical Center, Ann Arbor, MI 48109
+Phone: (734) 555-0391  |  Email: p.nguyen@umich.edu
+Reporter Type: Physician (Healthcare Professional)
+Report Type: Spontaneous
+
+SECTION E — NARRATIVE
+Dr. Nguyen reports a 67-year-old male with type 2 diabetes, hypertension, and mild chronic kidney disease (CKD stage 2, baseline creatinine 1.1 mg/dL) who had been maintained on metformin 1000 mg twice daily for 6 years with stable glycemic control. On August 27, 2024, the patient underwent contrast-enhanced CT abdomen/pelvis for evaluation of abdominal pain (iohexol 350 mg/mL, 100 mL IV). Metformin was not held pre- or post-procedure per the ordering physician's oversight. Over the following 3 days, the patient developed progressive nausea, vomiting, abdominal cramping, and confusion. He presented to the emergency department on August 31, 2024. Vital signs: BP 94/60 mmHg, HR 104 bpm, RR 28/min, temperature 37.1°C. Laboratory findings: serum creatinine 3.8 mg/dL (AKI, likely contrast nephropathy), arterial lactate 14.2 mmol/L, pH 6.98, bicarbonate 6 mEq/L. Metformin serum level: 28 mcg/mL (reference toxic >5 mcg/mL). Diagnosis confirmed as metformin-associated lactic acidosis (MALA) in the setting of contrast-induced AKI. Patient admitted to the medical ICU. Emergent hemodialysis initiated for clearance of metformin and correction of acidosis. Three sessions of hemodialysis performed over 48 hours. Patient's mental status and hemodynamics improved by Day 3. Full recovery of renal function (creatinine 1.3 mg/dL at discharge) by Day 8. Metformin permanently discontinued; SGLT-2 inhibitor deferred given renal concerns; patient transitioned to insulin. Reporter attributes event to metformin accumulation secondary to contrast-induced AKI, exacerbated by failure to hold metformin per current guidelines.
+
+Reporter's Causality Assessment: Probable
+Reporter Comments: "Classic MALA precipitated by contrast nephropathy and failure to hold metformin. FDA Boxed Warning for renal impairment directly applicable. Preventable event — recommend safety report and potential label communication review."`,
+      audit_trail: [
+        {
+          action: "BRIEF_GENERATED",
+          timestamp: "2024-09-04T16:45:12Z",
+          actor: "Vigio AI Pipeline v0.1",
+          note: "Full three-layer intelligence brief generated from ICSR PDF. Processing time: 35.9s."
+        }
+      ]
+    }
+  }
+];
+
+/* ─── API helpers ─────────────────────────────────────────────────────── */
+const BASE = '';
+
+async function uploadPDF(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const r = await fetch(`${BASE}/api/upload`, { method: 'POST', body: form });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function startAnalysis(caseId) {
+  const r = await fetch(`${BASE}/api/analyze?case_id=${caseId}`, { method: 'POST' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function pollStatus(caseId) {
+  const r = await fetch(`${BASE}/api/status/${caseId}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function getBrief(caseId) {
+  const r = await fetch(`${BASE}/api/brief/${caseId}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function confirmBrief(caseId, name, decision, notes) {
+  const p = new URLSearchParams({ reviewer_name: name, reviewer_decision: decision });
+  if (notes) p.set('reviewer_notes', notes);
+  const r = await fetch(`${BASE}/api/confirm/${caseId}?${p}`, { method: 'POST' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+/* ─── Color maps ──────────────────────────────────────────────────────── */
+const TRIGGER_COLOR = {
+  '7-Day (Fatal/Life-Threatening Unexpected)': '#ef4444',
+  '15-Day (Serious Unexpected)': '#f59e0b',
+  'Periodic (Expected or Non-Serious)': '#22c55e',
+  'Not Applicable': '#64748b',
+};
+
+const ACTION_COLOR = {
+  'Submit 7-Day Expedited Report': '#ef4444',
+  'Submit 15-Day Expedited Report': '#f59e0b',
+  'Include in Periodic Safety Report': '#22c55e',
+  'Obtain Follow-Up Information': '#a78bfa',
+  'No Regulatory Action Required': '#64748b',
+  'Senior Medical Review Required': '#38bdf8',
+};
+
+/* ─── Small shared components ─────────────────────────────────────────── */
+function Card({ children, style }) {
+  return <div style={{ background:'#1e293b', borderRadius:8, padding:'10px 14px', ...style }}>{children}</div>;
+}
+
+function SectionTitle({ children }) {
+  return <p style={{ fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.6px', marginTop:8, marginBottom:6 }}>{children}</p>;
+}
+
+function Badge({ label, color }) {
+  return (
+    <span style={{ background:`${color}22`, border:`1px solid ${color}66`, color, fontSize:12, fontWeight:600, padding:'3px 10px', borderRadius:6, whiteSpace:'nowrap' }}>
+      {label}
+    </span>
+  );
+}
+
+/* ─── Demo Case Cards ─────────────────────────────────────────────────── */
+function DemoCaseCard({ demo, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onClick={() => onClick(demo)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? '#1e3a5f' : '#131c2e',
+        border: `1px solid ${hovered ? '#3b5998' : '#1e293b'}`,
+        borderRadius: 8,
+        padding: '10px 12px',
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 12, fontWeight: 700, color: '#cbd5e1', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {demo.label}
+        </p>
+        <p style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {demo.event}
+        </p>
+      </div>
+      <span style={{
+        background: `${demo.triggerColor}22`,
+        border: `1px solid ${demo.triggerColor}55`,
+        color: demo.triggerColor,
+        fontSize: 10,
+        fontWeight: 700,
+        padding: '2px 8px',
+        borderRadius: 4,
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+      }}>
+        {demo.triggerLabel}
+      </span>
+    </div>
+  );
+}
+
+/* ─── Upload Panel ────────────────────────────────────────────────────── */
+function UploadPanel({ onCaseStarted, onDemoSelected }) {
+  const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const inputRef = useRef();
+
+  const handle = async (file) => {
+    if (!file?.name.toLowerCase().endsWith('.pdf')) { setErr('Please upload a PDF'); return; }
+    setErr(null); setBusy(true);
+    try {
+      const { case_id } = await uploadPDF(file);
+      await startAnalysis(case_id);
+      onCaseStarted(case_id);
+    } catch(e) { setErr(e.message || 'Upload failed'); } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16, padding:'24px 20px', height:'100%', overflowY:'auto' }}>
+      {/* Logo */}
+      <div style={{ paddingBottom: 4 }}>
+        <div style={{ fontSize:26, fontWeight:800, color:'#60a5fa', letterSpacing:'-0.5px' }}>Vigio</div>
+        <div style={{ fontSize:11, color:'#475569', textTransform:'uppercase', letterSpacing:'0.8px' }}>Case Intelligence Platform</div>
+      </div>
+
+      {/* Demo cases section */}
+      <div style={{ background:'#0d1829', border:'1px solid #1e293b', borderRadius:10, padding:'12px 14px' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+          <p style={{ fontSize:11, fontWeight:700, color:'#60a5fa', textTransform:'uppercase', letterSpacing:'0.6px' }}>
+            Demo Cases
+          </p>
+          <span style={{ fontSize:10, color:'#334155', background:'#1e293b', padding:'2px 8px', borderRadius:4, fontWeight:600 }}>
+            No backend required
+          </span>
+        </div>
+        <p style={{ fontSize:11, color:'#475569', marginBottom:10, lineHeight:1.5 }}>
+          Click any case to instantly view a pre-computed Intelligence Brief.
+        </p>
+        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          {DEMO_CASES.map(demo => (
+            <DemoCaseCard key={demo.id} demo={demo} onClick={onDemoSelected} />
+          ))}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+        <div style={{ flex:1, height:1, background:'#1e293b' }} />
+        <span style={{ fontSize:11, color:'#334155', fontWeight:600 }}>OR UPLOAD YOUR OWN</span>
+        <div style={{ flex:1, height:1, background:'#1e293b' }} />
+      </div>
+
+      {/* Drop zone */}
+      <div
+        onClick={() => !busy && inputRef.current?.click()}
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={e => { e.preventDefault(); setDragging(false); handle(e.dataTransfer.files[0]); }}
+        style={{
+          border: `2px dashed ${dragging ? '#60a5fa' : '#1e293b'}`,
+          borderRadius: 10,
+          background: dragging ? '#1e3a5f' : '#0d1117',
+          padding: '28px 16px',
+          textAlign: 'center',
+          cursor: busy ? 'default' : 'pointer',
+          transition: 'all 0.2s',
+          flexShrink: 0,
+        }}
+      >
+        <input ref={inputRef} type="file" accept=".pdf" hidden onChange={e => handle(e.target.files?.[0])} />
+        {busy ? (
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}>
+            <div style={{ width:28, height:28, border:'3px solid #1e293b', borderTop:'3px solid #60a5fa', borderRadius:'50%', animation:'spin 1s linear infinite' }} />
+            <p style={{ color:'#94a3b8', fontSize:13 }}>Uploading & starting analysis…</p>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize:30, marginBottom:8 }}>📄</div>
+            <p style={{ fontWeight:600, color:'#94a3b8', fontSize:13, marginBottom:3 }}>Drop case report PDF</p>
+            <p style={{ fontSize:12, color:'#334155' }}>or click to browse · requires backend</p>
+          </>
+        )}
+      </div>
+
+      {err && <div style={{ background:'#450a0a', border:'1px solid #ef4444', borderRadius:8, padding:'10px 14px', color:'#fca5a5', fontSize:13 }}>{err}</div>}
+
+      {/* Pipeline preview — compact */}
+      <div style={{ background:'#0d1117', borderRadius:8, padding:'12px 14px', flexShrink:0, border:'1px solid #1e293b' }}>
+        <p style={{ fontSize:10, fontWeight:700, color:'#334155', textTransform:'uppercase', letterSpacing:'0.6px', marginBottom:8 }}>Pipeline</p>
+        {[
+          ['🔍','PDF extraction'],
+          ['🧬','ICH E2A entities'],
+          ['⚖️','Regulatory Intelligence'],
+          ['📚','Clinical · PubMed'],
+          ['📊','Population · FAERS'],
+          ['📋','Brief synthesis'],
+        ].map(([icon, label]) => (
+          <div key={label} style={{ display:'flex', alignItems:'center', gap:8, padding:'4px 0', borderBottom:'1px solid #0f172a' }}>
+            <span style={{ fontSize:13, width:20, textAlign:'center' }}>{icon}</span>
+            <span style={{ fontSize:11, color:'#475569' }}>{label}</span>
+          </div>
+        ))}
+        <p style={{ fontSize:10, color:'#334155', marginTop:10, lineHeight:1.6 }}>
+          <strong style={{ color:'#475569' }}>Intelligence ≠ Determination.</strong> AI builds the brief; human reviewer decides.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Progress Tracker ────────────────────────────────────────────────── */
+function ProgressTracker({ status }) {
+  const pct = status?.progress || 0;
+  return (
+    <div style={{ padding:40, display:'flex', flexDirection:'column', gap:20, maxWidth:520, margin:'auto', marginTop:80 }}>
+      <p style={{ fontSize:18, fontWeight:600, color:'#e2e8f0' }}>Analyzing case…</p>
+      <div style={{ background:'#1e293b', borderRadius:999, height:8, overflow:'hidden' }}>
+        <div style={{ height:'100%', width:`${pct}%`, background:'linear-gradient(90deg,#1d4ed8,#60a5fa)', borderRadius:999, transition:'width 0.4s ease' }} />
+      </div>
+      <div style={{ display:'flex', justifyContent:'space-between' }}>
+        <span style={{ fontSize:13, color:'#64748b' }}>{status?.current_step}</span>
+        <span style={{ fontSize:13, fontWeight:700, color:'#60a5fa' }}>{pct}%</span>
+      </div>
+      {status?.status === 'error' && (
+        <div style={{ background:'#450a0a', border:'1px solid #ef4444', borderRadius:8, padding:16, color:'#fca5a5', fontSize:13 }}>
+          <strong>Analysis failed</strong><br />{status.error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Brief Viewer ────────────────────────────────────────────────────── */
+function BriefViewer({ brief, isDemo, onConfirmed }) {
+  const [tab, setTab] = useState('summary');
+  const [name, setName] = useState('');
+  const [decision, setDecision] = useState('');
+  const [notes, setNotes] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [localConfirmation, setLocalConfirmation] = useState(null);
+
+  const e = brief.entities;
+  const r = brief.regulatory;
+  const c = brief.clinical;
+  const p = brief.population;
+  const tColor = TRIGGER_COLOR[r.reporting_trigger] || '#64748b';
+  const aColor = ACTION_COLOR[brief.recommended_action] || '#64748b';
+
+  const doConfirm = async () => {
+    if (!name || !decision) return;
+    setConfirming(true);
+    try {
+      if (isDemo) {
+        // Demo mode — store locally
+        await new Promise(res => setTimeout(res, 800));
+        setLocalConfirmation({ reviewer_name: name, reviewer_decision: decision, reviewer_notes: notes, confirmed_at: new Date().toISOString() });
+        setConfirmed(true);
+        onConfirmed();
+      } else {
+        await confirmBrief(brief.case_id, name, decision, notes);
+        setConfirmed(true);
+        onConfirmed();
+      }
+    } finally { setConfirming(false); }
+  };
+
+  const confirmation = localConfirmation || brief.human_confirmation;
+
+  const tabs = [
+    { id:'source', label:'Source Case' },
+    { id:'summary', label:'Summary' },
+    { id:'regulatory', label:'Regulatory' },
+    { id:'clinical', label:'Clinical' },
+    { id:'population', label:'Population' },
+    { id:'confirm', label: confirmed ? '✓ Confirmed' : 'Confirm' },
+  ];
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
+      {/* Brief header */}
+      <div style={{ padding:'16px 22px 0', display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexShrink:0, gap:12 }}>
+        <div style={{ minWidth:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
+            <p style={{ fontSize:11, color:'#475569', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+              Case Intelligence Brief · {brief.case_id.slice(0,12).toUpperCase()}
+            </p>
+            {isDemo && (
+              <span style={{ fontSize:10, fontWeight:700, color:'#60a5fa', background:'#1d4ed822', border:'1px solid #1d4ed844', padding:'1px 7px', borderRadius:4 }}>
+                DEMO
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize:13, fontWeight:500, color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+            {brief.source_pdf_filename}
+          </p>
+        </div>
+        <div style={{ flexShrink:0 }}>
+          <Badge label={r.reporting_trigger} color={tColor} />
+        </div>
+      </div>
+
+      {/* Action banner */}
+      <div style={{ margin:'12px 22px 0', padding:'11px 14px', background:`${aColor}18`, borderLeft:`3px solid ${aColor}`, borderRadius:'0 8px 8px 0', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+        <div>
+          <p style={{ fontSize:10, color:'#94a3b8', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:2 }}>AI Recommended Action</p>
+          <p style={{ fontSize:14, fontWeight:700, color:'#e2e8f0' }}>{brief.recommended_action}</p>
+        </div>
+        <p style={{ fontSize:10, fontWeight:600, color:'#f59e0b', textAlign:'right', flexShrink:0 }}>
+          Intelligence ≠ Determination<br/><span style={{ fontWeight:400, color:'#64748b' }}>Human review required</span>
+        </p>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display:'flex', padding:'10px 22px 0', gap:2, borderBottom:'1px solid #1e293b', flexShrink:0 }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            background: tab===t.id ? '#1e293b' : 'transparent',
+            border: 'none', borderRadius:'6px 6px 0 0',
+            color: tab===t.id ? '#e2e8f0' : '#64748b',
+            fontSize:13, fontWeight: tab===t.id ? 600 : 400,
+            padding:'7px 14px', cursor:'pointer'
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div style={{ flex:1, overflowY:'auto', padding:'20px 22px' }}>
+
+        {tab === 'source' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <SectionTitle>Original Source Case</SectionTitle>
+              <span style={{ fontSize:10, color:'#475569', background:'#1e293b', border:'1px solid #334155', padding:'3px 8px', borderRadius:4, fontFamily:'monospace' }}>{brief.source_pdf_filename}</span>
+            </div>
+            <div style={{ background:'#0a0f1a', border:'1px solid #1e3a5f', borderRadius:8, padding:'16px 18px' }}>
+              <p style={{ fontSize:11, color:'#3b82f6', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:12, fontWeight:600 }}>Raw ICSR — as received before Vigio processing</p>
+              <pre style={{ fontSize:12, color:'#94a3b8', lineHeight:1.8, whiteSpace:'pre-wrap', fontFamily:"'Courier New', Courier, monospace", margin:0 }}>{brief.source_case}</pre>
+            </div>
+            <div style={{ background:'#1e2a1e', border:'1px solid #166534', borderRadius:8, padding:'10px 14px', display:'flex', gap:10, alignItems:'flex-start' }}>
+              <span style={{ fontSize:16, flexShrink:0 }}>↓</span>
+              <div>
+                <p style={{ fontSize:12, fontWeight:600, color:'#22c55e', marginBottom:2 }}>Vigio extracted and structured this case in {brief.audit_trail[0].note.match(/[\d.]+s/)?.[0] || '~40s'}</p>
+                <p style={{ fontSize:11, color:'#4ade80' }}>Switch to the Summary tab to see the generated Case Intelligence Brief →</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'summary' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <SectionTitle>Executive Summary</SectionTitle>
+            <p style={{ fontSize:13, color:'#94a3b8', lineHeight:1.75 }}>{brief.executive_summary}</p>
+
+            <SectionTitle>ICH E2A Four Elements</SectionTitle>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {[['Patient', e.patient||'—'], ['Reporter', e.reporter ? `${e.reporter}${e.reporter_type?` (${e.reporter_type})`:''}`:'—'], ['Suspect Product', e.suspect_product||'—'], ['Adverse Event', e.adverse_event||'—']].map(([l,v]) => (
+                <Card key={l}>
+                  <p style={{ fontSize:10, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:4 }}>{l}</p>
+                  <p style={{ fontSize:12, fontWeight:500, color:'#e2e8f0', lineHeight:1.5 }}>{v}</p>
+                </Card>
+              ))}
+            </div>
+
+            <div style={{ background: e.four_element_valid?'#14532d22':'#450a0a', border:`1px solid ${e.four_element_valid?'#166534':'#7f1d1d'}`, borderRadius:6, padding:'8px 14px', fontSize:13, color: e.four_element_valid?'#86efac':'#fca5a5' }}>
+              {e.four_element_valid ? '✓ Four-element valid (ICH E2A)' : `✗ Incomplete — missing: ${e.missing_elements?.join(', ')}`}
+            </div>
+
+            {brief.key_uncertainties?.length > 0 && (
+              <>
+                <SectionTitle>Key Uncertainties</SectionTitle>
+                <ul style={{ paddingLeft:18, display:'flex', flexDirection:'column', gap:6 }}>
+                  {brief.key_uncertainties.map((u,i) => <li key={i} style={{ fontSize:13, color:'#94a3b8', lineHeight:1.65 }}>{u}</li>)}
+                </ul>
+              </>
+            )}
+
+            {!isDemo && (
+              <div style={{ display:'flex', gap:8, marginTop:4 }}>
+                <a href={`/api/export/${brief.case_id}?format=json`} target="_blank" style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:6, padding:'6px 14px', fontSize:13, textDecoration:'none' }}>Export JSON</a>
+                <a href={`/api/export/${brief.case_id}?format=e2b`} target="_blank" style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:6, padding:'6px 14px', fontSize:13, textDecoration:'none' }}>Export E2B Stub</a>
+              </div>
+            )}
+            {isDemo && (
+              <p style={{ fontSize:11, color:'#334155', fontStyle:'italic' }}>Export available when connected to the Vigio backend.</p>
+            )}
+          </div>
+        )}
+
+        {tab === 'regulatory' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <SectionTitle>Layer 1 — Regulatory Intelligence</SectionTitle>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {[['Validity',r.validity_status],['Seriousness',r.seriousness],['Expectedness',r.expectedness],['Reporting Trigger',r.reporting_trigger]].map(([l,v]) => (
+                <Card key={l}>
+                  <p style={{ fontSize:10, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:4 }}>{l}</p>
+                  <p style={{ fontSize:12, fontWeight:500, color:'#e2e8f0' }}>{v}</p>
+                </Card>
+              ))}
+            </div>
+
+            {r.seriousness_criteria_met?.length > 0 && <>
+              <SectionTitle>21 CFR 312.32 Criteria Met</SectionTitle>
+              <ul style={{ paddingLeft:18, display:'flex', flexDirection:'column', gap:6 }}>
+                {r.seriousness_criteria_met.map((x,i) => <li key={i} style={{ fontSize:13, color:'#94a3b8', lineHeight:1.6 }}>{x}</li>)}
+              </ul>
+            </>}
+
+            {r.reporting_trigger_rationale && <>
+              <SectionTitle>Trigger Rationale</SectionTitle>
+              <p style={{ fontSize:13, color:'#94a3b8', lineHeight:1.75 }}>{r.reporting_trigger_rationale}</p>
+            </>}
+
+            {r.expectedness_basis && <>
+              <SectionTitle>Expectedness Basis</SectionTitle>
+              <p style={{ fontSize:13, color:'#94a3b8', lineHeight:1.75 }}>{r.expectedness_basis}</p>
+            </>}
+
+            {r.day_zero && <>
+              <SectionTitle>Day Zero (ICH E2A)</SectionTitle>
+              <p style={{ fontSize:13, fontFamily:'monospace', color:'#94a3b8' }}>{r.day_zero}</p>
+            </>}
+
+            {r.regulatory_notes && <>
+              <SectionTitle>Regulatory Notes</SectionTitle>
+              <p style={{ fontSize:13, color:'#94a3b8', lineHeight:1.75 }}>{r.regulatory_notes}</p>
+            </>}
+
+            <SectionTitle>Citations</SectionTitle>
+            <ul style={{ paddingLeft:18, display:'flex', flexDirection:'column', gap:5 }}>
+              {r.citations?.map((x,i) => <li key={i} style={{ fontSize:12, color:'#64748b', lineHeight:1.6 }}>{x}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {tab === 'clinical' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <SectionTitle>Layer 2 — Clinical Intelligence</SectionTitle>
+            <Card>
+              <p style={{ fontSize:10, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:4 }}>Clinical Plausibility</p>
+              <p style={{ fontSize:14, fontWeight:600, color:'#e2e8f0' }}>{c.clinical_plausibility || 'Unknown'}</p>
+            </Card>
+
+            <SectionTitle>Mechanistic Summary</SectionTitle>
+            <p style={{ fontSize:13, color:'#94a3b8', lineHeight:1.75 }}>{c.mechanistic_summary}</p>
+
+            {c.label_cross_reference && <>
+              <SectionTitle>Label Cross-Reference</SectionTitle>
+              <p style={{ fontSize:13, color:'#94a3b8', lineHeight:1.75 }}>{c.label_cross_reference}</p>
+            </>}
+
+            <SectionTitle>PubMed References ({c.pubmed_references?.length || 0})</SectionTitle>
+            {c.pubmed_references?.length > 0 ? c.pubmed_references.map(ref => (
+              <Card key={ref.pmid} style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                <a href={ref.url} target="_blank" style={{ fontSize:13, fontWeight:500, lineHeight:1.4 }}>{ref.title}</a>
+                <p style={{ fontSize:11, color:'#64748b' }}>{ref.authors} · {ref.journal} · {ref.year} · PMID {ref.pmid}</p>
+                <p style={{ fontSize:12, color:'#94a3b8', lineHeight:1.55 }}>{ref.relevance_summary}</p>
+              </Card>
+            )) : <p style={{ fontSize:13, color:'#475569' }}>No PubMed articles found.</p>}
+          </div>
+        )}
+
+        {tab === 'population' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <SectionTitle>Layer 3 — Population Intelligence</SectionTitle>
+            {p.faers_signal && (() => {
+              const rc = p.faers_signal.report_count || 0;
+              const confidence = rc >= 2000 ? { label:'High', color:'#22c55e', bg:'#14532d22', desc:'Large report volume — signal robust' }
+                               : rc >= 500  ? { label:'Moderate', color:'#f59e0b', bg:'#78350f22', desc:'Adequate report volume — interpret with care' }
+                               :              { label:'Low', color:'#ef4444', bg:'#7f1d1d22', desc:'Limited reports — treat signal with caution' };
+              return (<>
+                <div style={{ background: confidence.bg, border:`1px solid ${confidence.color}44`, borderRadius:8, padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div>
+                    <p style={{ fontSize:10, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:2 }}>Signal Data Confidence</p>
+                    <p style={{ fontSize:13, fontWeight:700, color: confidence.color }}>{confidence.label} <span style={{ fontWeight:400, color:'#94a3b8', fontSize:12 }}>— {confidence.desc}</span></p>
+                  </div>
+                  <div style={{ textAlign:'right', fontSize:11, color:'#64748b' }}>
+                    <p>Based on <span style={{ color:'#e2e8f0', fontWeight:600 }}>{rc.toLocaleString()} reports</span></p>
+                    <p>FAERS voluntary · underreporting expected</p>
+                  </div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  {[
+                    ['Drug', p.faers_signal.drug_name],
+                    ['Event', p.faers_signal.event_term],
+                    ['FAERS Reports', p.faers_signal.report_count?.toLocaleString()],
+                    ['Signal Strength', p.faers_signal.signal_strength],
+                    ['ROR', p.faers_signal.reporting_odds_ratio?.toFixed(2) ?? 'N/A'],
+                    ['Data Source', p.faers_signal.data_source],
+                  ].map(([l,v]) => (
+                    <Card key={l}>
+                      <p style={{ fontSize:10, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:4 }}>{l}</p>
+                      <p style={{ fontSize:12, fontWeight:500, color:'#e2e8f0' }}>{v}</p>
+                    </Card>
+                  ))}
+                </div>
+              </>);
+            })()}
+            <SectionTitle>Signal Summary</SectionTitle>
+            <p style={{ fontSize:13, color:'#94a3b8', lineHeight:1.75 }}>{p.signal_summary}</p>
+            {p.background_context && <>
+              <SectionTitle>Background Context</SectionTitle>
+              <p style={{ fontSize:13, color:'#94a3b8', lineHeight:1.75 }}>{p.background_context}</p>
+            </>}
+            {p.population_notes && <>
+              <SectionTitle>Population Notes</SectionTitle>
+              <p style={{ fontSize:13, color:'#94a3b8', lineHeight:1.75 }}>{p.population_notes}</p>
+            </>}
+            <p style={{ fontSize:11, color:'#475569', fontStyle:'italic', marginTop:4 }}>FAERS data is voluntary and subject to reporting bias. ROR does not establish causality.</p>
+          </div>
+        )}
+
+        {tab === 'confirm' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <SectionTitle>Human Regulatory Determination</SectionTitle>
+            {isDemo && (
+              <div style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:8, padding:'10px 14px', fontSize:12, color:'#64748b' }}>
+                Demo mode — confirmation is stored locally in this session only.
+              </div>
+            )}
+            <p style={{ fontSize:13, color:'#94a3b8', lineHeight:1.75 }}>
+              The AI has built the evidentiary brief. You, as the qualified pharmacovigilance reviewer, make the regulatory determination.
+              Your decision becomes part of the permanent audit trail.
+            </p>
+
+            {confirmed ? (
+              <div style={{ background:'#14532d22', border:'1px solid #166534', borderRadius:8, padding:20, display:'flex', flexDirection:'column', gap:8, fontSize:13, color:'#94a3b8' }}>
+                <p style={{ fontSize:15, fontWeight:700, color:'#86efac', marginBottom:4 }}>✓ Determination Recorded</p>
+                <p><strong style={{ color:'#e2e8f0' }}>Reviewer:</strong> {confirmation?.reviewer_name}</p>
+                <p><strong style={{ color:'#e2e8f0' }}>Decision:</strong> {confirmation?.reviewer_decision}</p>
+                {confirmation?.reviewer_notes && <p><strong style={{ color:'#e2e8f0' }}>Notes:</strong> {confirmation.reviewer_notes}</p>}
+              </div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                {[
+                  ['Reviewer Name *', <input key="name" placeholder="Full name" value={name} onChange={e=>setName(e.target.value)} style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:6, padding:'8px 12px', color:'#e2e8f0', fontSize:14, outline:'none', width:'100%' }} />],
+                  ['Regulatory Decision *', (
+                    <select key="dec" value={decision} onChange={e=>setDecision(e.target.value)} style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:6, padding:'8px 12px', color: decision ? '#e2e8f0' : '#64748b', fontSize:14, outline:'none', width:'100%' }}>
+                      <option value="">Select decision…</option>
+                      {['Submit 7-Day Expedited Report','Submit 15-Day Expedited Report','Include in Periodic Safety Report','Obtain Follow-Up Information','No Regulatory Action Required','Senior Medical Review Required'].map(o=><option key={o} style={{ color:'#e2e8f0' }}>{o}</option>)}
+                    </select>
+                  )],
+                  ['Notes / Rationale', <textarea key="notes" placeholder="Notes, override rationale, or any deviation from AI recommendation…" value={notes} onChange={e=>setNotes(e.target.value)} rows={3} style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:6, padding:'8px 12px', color:'#e2e8f0', fontSize:13, outline:'none', width:'100%', resize:'vertical' }} />],
+                ].map(([label, input]) => (
+                  <div key={label}>
+                    <p style={{ fontSize:12, fontWeight:600, color:'#94a3b8', marginBottom:6 }}>{label}</p>
+                    {input}
+                  </div>
+                ))}
+                <button
+                  onClick={doConfirm}
+                  disabled={!name || !decision || confirming}
+                  style={{ background:'#1d4ed8', color:'#fff', border:'none', borderRadius:6, padding:'10px 20px', fontSize:14, fontWeight:600, cursor:(!name||!decision||confirming)?'not-allowed':'pointer', opacity:(!name||!decision||confirming)?0.5:1, marginTop:4 }}
+                >
+                  {confirming ? 'Recording…' : 'Record Determination'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── App ──────────────────────────────────────────────────────────────── */
+function App() {
+  const [appState, setAppState] = useState('idle'); // idle | processing | complete | error
+  const [caseId, setCaseId] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [brief, setBrief] = useState(null);
+  const [isDemo, setIsDemo] = useState(false);
+  const pollRef = useRef(null);
+
+  const stopPoll = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+
+  const handleCaseStarted = (id) => { setIsDemo(false); setCaseId(id); setAppState('processing'); };
+
+  const handleDemoSelected = (demo) => {
+    stopPoll();
+    setIsDemo(true);
+    setBrief(demo.brief);
+    setAppState('complete');
+  };
+
+  useEffect(() => {
+    if (appState !== 'processing' || !caseId) return;
+    pollRef.current = setInterval(async () => {
+      try {
+        const s = await pollStatus(caseId);
+        setStatus(s);
+        if (s.status === 'complete') {
+          stopPoll();
+          const b = await getBrief(caseId);
+          setBrief(b);
+          setAppState('complete');
+        } else if (s.status === 'error') {
+          stopPoll();
+          setAppState('error');
+        }
+      } catch(e) { console.error('poll error', e); }
+    }, 2000);
+    return stopPoll;
+  }, [appState, caseId]);
+
+  const reset = () => { stopPoll(); setAppState('idle'); setCaseId(null); setStatus(null); setBrief(null); setIsDemo(false); };
+
+  return (
+    <div style={{ display:'flex', height:'100vh', overflow:'hidden' }}>
+      {/* Left */}
+      <div style={{ width:340, flexShrink:0, borderRight:'1px solid #1e293b', background:'#0d1117', display:'flex', flexDirection:'column', overflowY:'auto' }}>
+        <UploadPanel onCaseStarted={handleCaseStarted} onDemoSelected={handleDemoSelected} />
+        {appState !== 'idle' && (
+          <button onClick={reset} style={{ margin:'0 20px 20px', background:'transparent', border:'1px solid #1e293b', color:'#475569', fontSize:12, padding:'7px 16px', borderRadius:6, cursor:'pointer' }}>
+            ← Back to cases
+          </button>
+        )}
+      </div>
+
+      {/* Right */}
+      <div style={{ flex:1, background:'#0a0f1a', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        {appState === 'idle' && (
+          <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, padding:48 }}>
+            <div style={{ fontSize:52 }}>🧬</div>
+            <p style={{ fontSize:16, fontWeight:500, color:'#334155', textAlign:'center', maxWidth:380 }}>Select a demo case or upload a PDF to generate a Case Intelligence Brief</p>
+            <p style={{ fontSize:13, color:'#1e293b', textAlign:'center' }}>Regulatory · Clinical · Population</p>
+          </div>
+        )}
+
+        {appState === 'processing' && <ProgressTracker status={status} />}
+
+        {appState === 'complete' && brief && <BriefViewer brief={brief} isDemo={isDemo} onConfirmed={() => {}} />}
+
+        {appState === 'error' && (
+          <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, padding:48 }}>
+            <p style={{ fontSize:18, fontWeight:600, color:'#ef4444' }}>Analysis failed</p>
+            <p style={{ fontSize:13, color:'#94a3b8', textAlign:'center', maxWidth:400 }}>{status?.error || 'Unknown error'}</p>
+            <button onClick={reset} style={{ background:'#1e293b', color:'#e2e8f0', border:'1px solid #334155', borderRadius:6, padding:'8px 20px', fontSize:14, cursor:'pointer', marginTop:8 }}>Try again</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
