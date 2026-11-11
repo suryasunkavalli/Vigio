@@ -103,10 +103,12 @@ class ClinicalIntelligence(BaseModel):
 class FAERSSignal(BaseModel):
     drug_name: str
     event_term: str
-    report_count: int
-    total_drug_reports: int
+    report_count: Optional[int] = None
+    total_drug_reports: Optional[int] = None
     reporting_odds_ratio: Optional[float] = None
-    signal_strength: str = ""  # Strong / Moderate / Weak / Insufficient data
+    signal_strength: str = ""
+    query_status: str = "success"  # success / no_results / partial / unavailable
+    query_note: str = ""
     data_source: str = "FDA FAERS / OpenFDA"
     query_timestamp: datetime = Field(default_factory=datetime.utcnow)
 

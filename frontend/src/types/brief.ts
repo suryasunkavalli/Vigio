@@ -50,10 +50,12 @@ export interface ClinicalIntelligence {
 export interface FAERSSignal {
   drug_name: string;
   event_term: string;
-  report_count: number;
-  total_drug_reports: number;
+  report_count: number | null;
+  total_drug_reports: number | null;
   reporting_odds_ratio: number | null;
   signal_strength: string;
+  query_status: 'success' | 'no_results' | 'partial' | 'unavailable';
+  query_note: string;
   data_source: string;
 }
 

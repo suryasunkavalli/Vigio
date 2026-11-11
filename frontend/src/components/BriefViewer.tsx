@@ -197,9 +197,10 @@ export default function BriefViewer({ brief, onConfirmed }: Props) {
                 {[
                   ['Drug', p.faers_signal.drug_name],
                   ['Event', p.faers_signal.event_term],
-                  ['FAERS Reports', p.faers_signal.report_count.toLocaleString()],
-                  ['Signal Strength', p.faers_signal.signal_strength],
-                  ['ROR', p.faers_signal.reporting_odds_ratio?.toFixed(2) || 'N/A'],
+                  ['FAERS Reports', p.faers_signal.report_count?.toLocaleString() ?? 'Unavailable'],
+                  ['Total Drug Reports', p.faers_signal.total_drug_reports?.toLocaleString() ?? 'Unavailable'],
+                  ['Query Status', p.faers_signal.query_status],
+                  ['ROR', 'Unavailable in MVP'],
                   ['Data Source', p.faers_signal.data_source],
                 ].map(([label, val]) => (
                   <div key={label} style={styles.card}>
@@ -209,6 +210,7 @@ export default function BriefViewer({ brief, onConfirmed }: Props) {
                 ))}
               </div>
             )}
+            {p.faers_signal?.query_note && <p style={styles.dimText}>{p.faers_signal.query_note}</p>}
             <h3 style={styles.sectionTitle}>Signal Summary</h3>
             <p style={styles.para}>{p.signal_summary}</p>
             {p.background_context && (
@@ -217,7 +219,7 @@ export default function BriefViewer({ brief, onConfirmed }: Props) {
             {p.population_notes && (
               <><h3 style={styles.sectionTitle}>Population Notes</h3><p style={styles.para}>{p.population_notes}</p></>
             )}
-            <p style={styles.disclaimer}>FAERS data is voluntary and subject to reporting bias. ROR does not establish causality.</p>
+            <p style={styles.disclaimer}>FAERS reports are voluntary, can contain duplicates, and cannot establish incidence or causality. ROR is not calculated in this MVP.</p>
           </div>
         )}
 

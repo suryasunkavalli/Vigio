@@ -10,7 +10,7 @@ Three-layer pharmacovigilance AI. Upload a case report PDF, get a structured Cas
 2. **ICH E2A entity extraction** — patient, reporter, suspect product, adverse event
 3. **Layer 1: Regulatory Intelligence** — validity, seriousness (21 CFR 312.32), 7/15-day trigger, expectedness
 4. **Layer 2: Clinical Intelligence** — PubMed mechanistic literature with PMID citations
-5. **Layer 3: Population Intelligence** — OpenFDA FAERS signal, ROR disproportionality
+5. **Layer 3: Population Intelligence** — OpenFDA FAERS report-count context
 6. **Case Intelligence Brief** — synthesized reviewer-facing output with recommended action and human confirmation workflow
 
 > **Intelligence ≠ Determination.** Vigio builds the evidentiary brief. A qualified human reviewer makes the regulatory determination.
@@ -101,7 +101,7 @@ vigio-mvp/
 |--------|-------------|------|
 | Anthropic Claude | Entity extraction, all three intelligence layers | API usage |
 | NCBI PubMed E-utilities | esearch + esummary for mechanistic literature | Free |
-| OpenFDA FAERS | Drug-event report counts, ROR calculation | Free |
+| OpenFDA FAERS | Drug-event and drug report counts | Free |
 
 ## Validation
 
@@ -133,7 +133,7 @@ The smoke test calls Anthropic four times and also queries PubMed and OpenFDA.
 Every claim in the brief carries a source:
 - Regulatory assessments cite ICH E2A (1994) and 21 CFR 312.32
 - Clinical findings cite PMID URLs
-- Population signals cite OpenFDA with report counts and ROR
+- Population context cites OpenFDA report counts and query status; ROR is not calculated in the MVP
 - Human reviewer decision + timestamp recorded in audit trail
 
 ---

@@ -1,164 +1,171 @@
-"""
-Layer 3: Population Intelligence
-- Queries OpenFDA (FAERS) for drug-event disproportionality
-- Calculates reporting signal strength
-- Provides background context
-"""
+"""Layer 3: OpenFDA FAERS report-count context for a case."""
+
+import logging
+from dataclasses import dataclass
+from typing import Literal
 
 import httpx
-import logging
 from anthropic import Anthropic
-from backend.models.case import CaseEntities, PopulationIntelligence, FAERSSignal
+
+from backend.models.case import CaseEntities, FAERSSignal, PopulationIntelligence
 from backend.services.anthropic_service import create_message, response_text
 
 logger = logging.getLogger(__name__)
 
 OPENFDA_BASE = "https://api.fda.gov/drug/event.json"
+QueryStatus = Literal["success", "no_results", "unavailable"]
 
 
-def query_faers_event_count(drug: str, event: str) -> int:
-    """Count reports for drug + event combination in FAERS."""
+@dataclass(frozen=True)
+class FAERSQueryResult:
+    count: int | None
+    status: QueryStatus
+    note: str
+
+
+def _query_faers_count(search: str, description: str) -> FAERSQueryResult:
+    """Query one OpenFDA count while preserving no-result and failure states."""
     try:
-        resp = httpx.get(
+        response = httpx.get(
             OPENFDA_BASE,
-            params={
-                "search": f'patient.drug.medicinalproduct:"{drug}" AND patient.reaction.reactionmeddrapt:"{event}"',
-                "limit": 1
-            },
-            timeout=10.0
+            params={"search": search, "limit": 1},
+            timeout=10.0,
         )
-        if resp.status_code == 200:
-            return resp.json().get("meta", {}).get("results", {}).get("total", 0)
-        return 0
-    except Exception as e:
-        logger.warning(f"FAERS drug+event query failed: {e}")
-        return 0
 
+        if response.status_code == 200:
+            total = response.json().get("meta", {}).get("results", {}).get("total")
+            if not isinstance(total, int):
+                return FAERSQueryResult(
+                    count=None,
+                    status="unavailable",
+                    note=f"OpenFDA returned no usable total for {description}.",
+                )
+            return FAERSQueryResult(
+                count=total,
+                status="success",
+                note=f"OpenFDA returned a report count for {description}.",
+            )
 
-def query_faers_drug_total(drug: str) -> int:
-    """Count all reports for the drug in FAERS."""
-    try:
-        resp = httpx.get(
-            OPENFDA_BASE,
-            params={
-                "search": f'patient.drug.medicinalproduct:"{drug}"',
-                "limit": 1
-            },
-            timeout=10.0
+        if response.status_code == 404:
+            try:
+                error_message = response.json().get("error", {}).get("message", "")
+            except ValueError:
+                error_message = ""
+            if "no matches" in error_message.lower():
+                return FAERSQueryResult(
+                    count=0,
+                    status="no_results",
+                    note=f"OpenFDA found no matching reports for {description}.",
+                )
+
+        response.raise_for_status()
+        return FAERSQueryResult(
+            count=None,
+            status="unavailable",
+            note=f"OpenFDA did not return a usable result for {description}.",
         )
-        if resp.status_code == 200:
-            return resp.json().get("meta", {}).get("results", {}).get("total", 0)
-        return 0
-    except Exception as e:
-        logger.warning(f"FAERS drug total query failed: {e}")
-        return 0
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+        logger.warning("FAERS query unavailable for %s: %s", description, exc)
+        return FAERSQueryResult(
+            count=None,
+            status="unavailable",
+            note=f"OpenFDA was unavailable for {description}.",
+        )
 
 
-def calculate_ror(
-    drug_event: int,
-    drug_total: int,
-    all_event_approx: int = 50000,
-    all_reports_total: int = 29_000_000
-) -> float | None:
-    """
-    Calculate Reporting Odds Ratio (ROR) — a standard FAERS disproportionality metric.
-    ROR = (a/b) / (c/d)
-    a = drug+event, b = drug without event, c = other drugs+event, d = other drugs without event
-    """
-    a = drug_event
-    b = max(drug_total - drug_event, 1)
-    c = max(all_event_approx - drug_event, 1)
-    d = max(all_reports_total - drug_total - c, 1)
-
-    if a == 0 or b == 0:
-        return None
-    return round((a / b) / (c / d), 2)
+def query_faers_event_count(drug: str, event: str) -> FAERSQueryResult:
+    return _query_faers_count(
+        f'patient.drug.medicinalproduct:"{drug}" AND patient.reaction.reactionmeddrapt:"{event}"',
+        f"{drug} and {event}",
+    )
 
 
-def signal_strength_label(ror: float | None, count: int) -> str:
-    if count < 3:
-        return "Insufficient Data (< 3 reports)"
-    if ror is None:
-        return "Unable to calculate"
-    if ror >= 10:
-        return "Strong Signal (ROR ≥ 10)"
-    if ror >= 3:
-        return "Moderate Signal (ROR 3-10)"
-    if ror >= 1.5:
-        return "Weak Signal (ROR 1.5-3)"
-    return "No Disproportionate Signal (ROR < 1.5)"
+def query_faers_drug_total(drug: str) -> FAERSQueryResult:
+    return _query_faers_count(
+        f'patient.drug.medicinalproduct:"{drug}"',
+        drug,
+    )
+
+
+def _display_count(result: FAERSQueryResult) -> str:
+    return f"{result.count:,}" if result.count is not None else "unavailable"
+
+
+def _combined_status(
+    event_result: FAERSQueryResult,
+    drug_result: FAERSQueryResult,
+) -> tuple[str, str]:
+    if event_result.status == "unavailable" and drug_result.status == "unavailable":
+        return "unavailable", "OpenFDA queries were unavailable."
+    if event_result.status == "unavailable" or drug_result.status == "unavailable":
+        return "partial", "One OpenFDA query was unavailable; available counts are shown."
+    if event_result.status == "no_results":
+        return "no_results", "OpenFDA found no matching drug-event reports."
+    return "success", "OpenFDA report counts were retrieved successfully."
 
 
 def assess_population_intelligence(
     entities: CaseEntities,
-    client: Anthropic
+    client: Anthropic,
 ) -> PopulationIntelligence:
-    """
-    Query FAERS via OpenFDA, calculate ROR, and synthesize population signal.
-    """
-    logger.info(f"Running population intelligence for case {entities.case_id}")
+    """Retrieve FAERS counts and synthesize cautious population context."""
+    logger.info("Running population intelligence for case %s", entities.case_id)
 
-    drug = (entities.suspect_product or "").split()[0]  # Use primary drug name
+    drug = (entities.suspect_product or "").split()[0]
     event = entities.adverse_event or ""
 
     if not drug or not event:
         return PopulationIntelligence(
-            signal_summary="Insufficient case data to perform population intelligence query.",
-            population_notes="Drug name or adverse event term not identified in case."
+            signal_summary="Insufficient case data to query OpenFDA FAERS.",
+            population_notes="Drug name or adverse event term was not identified.",
         )
 
-    # Query FAERS
-    drug_event_count = query_faers_event_count(drug, event)
-    drug_total_count = query_faers_drug_total(drug)
-
-    ror = calculate_ror(drug_event_count, drug_total_count)
-    strength = signal_strength_label(ror, drug_event_count)
+    event_result = query_faers_event_count(drug, event)
+    drug_result = query_faers_drug_total(drug)
+    query_status, query_note = _combined_status(event_result, drug_result)
 
     faers_signal = FAERSSignal(
         drug_name=drug,
         event_term=event,
-        report_count=drug_event_count,
-        total_drug_reports=drug_total_count,
-        reporting_odds_ratio=ror,
-        signal_strength=strength
+        report_count=event_result.count,
+        total_drug_reports=drug_result.count,
+        reporting_odds_ratio=None,
+        signal_strength="Not calculated (MVP)",
+        query_status=query_status,
+        query_note=query_note,
     )
 
-    # Synthesize context with Claude
     prompt = f"""Drug: {drug}
 Adverse Event: {event}
 
-FAERS Data:
-- Reports for this drug + event combination: {drug_event_count:,}
-- Total FAERS reports for this drug: {drug_total_count:,}
-- Reporting Odds Ratio (ROR): {ror if ror else 'insufficient data'}
-- Signal Strength: {strength}
-- FAERS database: ~29 million reports (OpenFDA)
+OpenFDA FAERS query results:
+- Drug-event reports: {_display_count(event_result)}
+- Total reports for the drug: {_display_count(drug_result)}
+- Query status: {query_status}
+- Query note: {query_note}
+- Reporting Odds Ratio: not calculated in this MVP
 
 Provide:
-1. A brief population signal summary (2-3 sentences) suitable for a regulatory reviewer
-2. Background context on what is known about this drug's adverse event profile in the general population
-3. Any caveats about FAERS data limitations relevant to this case
+1. A cautious population-context summary for a regulatory reviewer
+2. Relevant limitations of spontaneous-report data
 
-Be factual. Do not overstate the signal. Note that FAERS data is voluntary, subject to reporting bias, and does not establish causality."""
+Do not infer missing report counts or a signal strength. Do not claim causality.
+State clearly that a report count is not an incidence rate and that ROR was not calculated."""
 
     response = create_message(
         client,
         max_tokens=800,
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
+        messages=[{"role": "user", "content": prompt}],
     )
-
     synthesis = response_text(response, "population intelligence")
-
-    # Split into summary + notes
     lines = synthesis.split("\n")
-    signal_summary = lines[0] if lines else synthesis
-    population_notes = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
 
     return PopulationIntelligence(
         faers_signal=faers_signal,
-        background_context=f"OpenFDA FAERS (29M+ reports): {drug_event_count:,} reports for {drug} + {event}. ROR: {ror or 'N/A'}. {strength}.",
-        population_notes=population_notes,
-        signal_summary=signal_summary
+        background_context=(
+            f"OpenFDA FAERS drug-event reports: {_display_count(event_result)}. "
+            f"Total drug reports: {_display_count(drug_result)}. ROR unavailable in MVP."
+        ),
+        population_notes="\n".join(lines[1:]).strip() if len(lines) > 1 else "",
+        signal_summary=lines[0] if lines else synthesis,
     )

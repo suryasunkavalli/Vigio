@@ -111,15 +111,15 @@ const DEMO_CASES = [
           drug_name: "warfarin",
           event_term: "intracranial haemorrhage",
           report_count: 4821,
-          signal_strength: "Strong",
-          reporting_odds_ratio: 8.74,
+          signal_strength: "Not calculated (MVP)",
+          reporting_odds_ratio: null,
           data_source: "FDA FAERS (OpenFDA) — cumulative through Q4 2023"
         },
-        signal_summary: "Warfarin-associated intracranial hemorrhage represents one of the strongest and most consistently observed signals in the FAERS database, with 4,821 cumulative reports and an ROR of 8.74 (95% CI 8.31–9.19). This is a well-characterized, class-defining safety signal for vitamin K antagonists.",
+        signal_summary: "FAERS contains 4,821 reports for warfarin-associated intracranial hemorrhage in this demonstration dataset. Report counts provide context but do not establish incidence, signal strength, or causality.",
         background_context: "Warfarin carries a known annual intracranial hemorrhage rate of 0.3–0.6% in AF patients at therapeutic anticoagulation. Risk escalates sharply with supratherapeutic INR, older age, hypertension, and concomitant antiplatelet use. The FAERS signal is consistent with decades of post-marketing surveillance and Phase IV data. Direct oral anticoagulants (DOACs) have largely replaced warfarin in AF indications precisely because of this risk profile.",
-        population_notes: "FAERS reports are voluntary and subject to underreporting and Weber effect bias. The observed ROR likely underestimates true risk in the elderly population, which is underrepresented in spontaneous reporting. The signal should be interpreted in the context of warfarin's known mechanism and extensive labeling."
+        population_notes: "FAERS reports are voluntary and subject to underreporting, duplicate reports, and reporting bias. The count should be interpreted alongside warfarin's known mechanism and approved labeling."
       },
-      executive_summary: "A 74-year-old male on warfarin for non-valvular atrial fibrillation presented with spontaneous intracranial hemorrhage (subdural + subarachnoid) in the setting of supratherapeutic anticoagulation (INR 4.8). The case meets all four ICH E2A validity elements. Seriousness criteria are satisfied on three grounds: life-threatening presentation, prolonged ICU hospitalization, and resulting significant disability. Clinical plausibility is high — the mechanistic link between supratherapeutic warfarin anticoagulation and intracranial hemorrhage is well-established and supported by strong FAERS signal (ROR 8.74, n=4,821). The event is labeled in the Coumadin PI; however, severity warrants 15-day expedited reporting. Warfarin has been permanently discontinued; patient transitioned to apixaban.",
+      executive_summary: "A 74-year-old male on warfarin for non-valvular atrial fibrillation presented with spontaneous intracranial hemorrhage (subdural + subarachnoid) in the setting of supratherapeutic anticoagulation (INR 4.8). The case meets all four ICH E2A validity elements. Seriousness criteria are satisfied on three grounds: life-threatening presentation, prolonged ICU hospitalization, and resulting significant disability. Clinical plausibility is high, and FAERS report counts provide supporting population context without establishing incidence or causality. The event is labeled in the Coumadin PI; however, severity warrants 15-day expedited reporting. Warfarin has been permanently discontinued; patient transitioned to apixaban.",
       recommended_action: "Submit 15-Day Expedited Report",
       recommended_action_rationale: "Event is serious (life-threatening, hospitalization, disability) and while labeled as a class risk, the specific severity of presentation with supratherapeutic INR and multifocal hemorrhage constitutes an important labeled serious adverse event requiring expedited reporting under 21 CFR 312.32(c)(1)(i).",
       key_uncertainties: [
@@ -255,15 +255,15 @@ Reporter Comments: "INR elevation cause unclear — possible interaction with re
           drug_name: "pembrolizumab",
           event_term: "myocarditis",
           report_count: 1247,
-          signal_strength: "Strong",
-          reporting_odds_ratio: 22.4,
+          signal_strength: "Not calculated (MVP)",
+          reporting_odds_ratio: null,
           data_source: "FDA FAERS (OpenFDA) — cumulative through Q4 2023"
         },
-        signal_summary: "Pembrolizumab-associated myocarditis demonstrates one of the strongest disproportionality signals among all PD-1 inhibitors in FAERS (ROR 22.4, n=1,247 reports). The signal is consistent across multiple approved indications and has been documented in regulatory communications and label updates. This is a class effect observed across all checkpoint inhibitors.",
+        signal_summary: "This demonstration dataset contains 1,247 FAERS reports for pembrolizumab-associated myocarditis. The count provides spontaneous-report context but does not establish incidence, signal strength, or causality.",
         background_context: "Immune-mediated myocarditis is a rare but potentially fatal complication of PD-1/PD-L1 inhibitors, with an incidence of approximately 0.5–1.5% across indications. Despite low absolute incidence, myocarditis carries the highest case fatality rate (~25–50% in fulminant presentations) of all cardiac irAEs. The FDA has included immune-mediated myocarditis as a Warnings and Precautions item for all approved checkpoint inhibitors. Post-marketing surveillance has identified combination immunotherapy regimens (PD-1 + CTLA-4) as carrying the highest risk.",
         population_notes: "Cardiac irAEs are subject to significant underreporting in FAERS due to diagnostic complexity and attribution challenges (tumor progression vs. irAE). The true incidence likely exceeds FAERS-derived estimates. Troponin elevation as an early biomarker of subclinical myocarditis is increasingly recognized in prospective surveillance programs."
       },
-      executive_summary: "A 58-year-old female with stage IIIB NSCLC developed Grade 4 immune-mediated myocarditis with cardiogenic shock (LVEF 18%) after 5 cycles of pembrolizumab-based chemotherapy. All four ICH E2A validity elements are satisfied. The event is life-threatening (LVEF 18%, cardiogenic shock, ICU), meeting the 7-day expedited reporting threshold under 21 CFR 312.32. Biopsy-confirmed CD8+ T-cell lymphocytic infiltration provides definitive mechanistic evidence of immune-mediated causality. The FAERS signal for pembrolizumab-myocarditis is among the strongest in the database (ROR 22.4). Pembrolizumab permanently discontinued; LVEF recovering to 52% at 6-week follow-up with corticosteroid treatment. This case warrants immediate 7-day IND safety report submission.",
+      executive_summary: "A 58-year-old female with stage IIIB NSCLC developed Grade 4 immune-mediated myocarditis with cardiogenic shock (LVEF 18%) after 5 cycles of pembrolizumab-based chemotherapy. All four ICH E2A validity elements are satisfied. The event is life-threatening (LVEF 18%, cardiogenic shock, ICU), meeting the 7-day expedited reporting threshold under 21 CFR 312.32. Biopsy-confirmed CD8+ T-cell lymphocytic infiltration provides strong case-level mechanistic evidence, while FAERS report counts provide population context without establishing causality. Pembrolizumab permanently discontinued; LVEF recovering to 52% at 6-week follow-up with corticosteroid treatment. This case warrants immediate 7-day IND safety report submission.",
       recommended_action: "Submit 7-Day Expedited Report",
       recommended_action_rationale: "Grade 4 immune-mediated myocarditis with cardiogenic shock (LVEF 18%) is a life-threatening event meeting the 7-day reporting threshold under 21 CFR 312.32(c)(2). Biopsy-confirmed immune causality, ICU admission, and permanent drug discontinuation support urgent regulatory notification.",
       key_uncertainties: [
@@ -400,15 +400,15 @@ Reporter Comments: "Biopsy-confirmed immune-mediated myocarditis. Classic presen
           drug_name: "metformin",
           event_term: "lactic acidosis",
           report_count: 2183,
-          signal_strength: "Strong",
-          reporting_odds_ratio: 11.2,
+          signal_strength: "Not calculated (MVP)",
+          reporting_odds_ratio: null,
           data_source: "FDA FAERS (OpenFDA) — cumulative through Q4 2023"
         },
-        signal_summary: "Metformin-associated lactic acidosis is a well-characterized, strongly signaled event in FAERS (ROR 11.2, n=2,183 reports). The signal has been stable and persistent since metformin's US approval and is the basis for the Boxed Warning. FAERS reports show a clustering pattern in patients with CKD, acute illness, and radiographic contrast exposure — consistent with this case.",
+        signal_summary: "This demonstration dataset contains 2,183 FAERS reports for metformin-associated lactic acidosis. The count provides spontaneous-report context but does not establish incidence, signal strength, or causality.",
         background_context: "MALA incidence is estimated at 3–10 cases per 100,000 patient-years at therapeutic doses in patients with normal renal function. In patients with CKD (eGFR 30–45), incidence increases approximately 5-fold. The 2016 FDA labeling update extended metformin use to lower eGFR thresholds based on epidemiologic data suggesting lower risk than historically assumed, but this was conditional on regular monitoring — the gap highlighted by this case. Mortality in confirmed MALA treated with hemodialysis is approximately 15–25%; without dialysis, mortality approaches 50%.",
         population_notes: "FAERS reports for MALA likely represent significant underreporting, as the diagnosis requires arterial lactate measurement and clinical suspicion — many cases may be attributed to AKI or sepsis without full workup. The true population-level incidence in patients with CKD who continue metformin without adequate monitoring may be substantially higher than published estimates."
       },
-      executive_summary: "A 67-year-old male with CKD stage 3b (eGFR 32, not re-evaluated in 8 months) on long-term metformin 1000 mg BID developed life-threatening lactic acidosis (lactate 14.2 mmol/L, pH 6.98, serum metformin 28 mcg/mL) precipitated by acute dehydrating illness. All four ICH E2A validity elements are complete. The event satisfies three seriousness criteria: life-threatening, ICU hospitalization, and requirement for emergent hemodialysis. MALA is a Boxed Warning in the metformin PI, making this a labeled serious event requiring 15-day reporting. The clinical context raises a system-level signal: absence of documented renal monitoring per the 2016 FDA safety communication requirements. Strong FAERS signal (ROR 11.2, n=2,183). Patient survived; metformin permanently discontinued.",
+      executive_summary: "A 67-year-old male with CKD stage 3b (eGFR 32, not re-evaluated in 8 months) on long-term metformin 1000 mg BID developed life-threatening lactic acidosis (lactate 14.2 mmol/L, pH 6.98, serum metformin 28 mcg/mL) precipitated by acute dehydrating illness. All four ICH E2A validity elements are complete. The event satisfies three seriousness criteria: life-threatening, ICU hospitalization, and requirement for emergent hemodialysis. MALA is a Boxed Warning in the metformin PI, making this a labeled serious event requiring 15-day reporting. The clinical context raises a system-level concern: absence of documented renal monitoring per the 2016 FDA safety communication requirements. FAERS report counts provide population context without establishing causality. Patient survived; metformin permanently discontinued.",
       recommended_action: "Submit 15-Day Expedited Report",
       recommended_action_rationale: "Life-threatening MALA meets seriousness criteria under 21 CFR 312.32. The Boxed Warning status makes this a labeled serious AE requiring 15-day IND safety reporting. Additionally, the documented monitoring failure (no eGFR re-evaluation for 8 months in CKD patient) may constitute a signal for risk management assessment and potential prescribing practice communication.",
       key_uncertainties: [
@@ -951,28 +951,15 @@ function BriefViewer({ brief, isDemo, onConfirmed }) {
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
             <SectionTitle>Layer 3 — Population Intelligence</SectionTitle>
             {p.faers_signal && (() => {
-              const rc = p.faers_signal.report_count || 0;
-              const confidence = rc >= 2000 ? { label:'High', color:'#22c55e', bg:'#14532d22', desc:'Large report volume — signal robust' }
-                               : rc >= 500  ? { label:'Moderate', color:'#f59e0b', bg:'#78350f22', desc:'Adequate report volume — interpret with care' }
-                               :              { label:'Low', color:'#ef4444', bg:'#7f1d1d22', desc:'Limited reports — treat signal with caution' };
               return (<>
-                <div style={{ background: confidence.bg, border:`1px solid ${confidence.color}44`, borderRadius:8, padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <div>
-                    <p style={{ fontSize:10, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:2 }}>Signal Data Confidence</p>
-                    <p style={{ fontSize:13, fontWeight:700, color: confidence.color }}>{confidence.label} <span style={{ fontWeight:400, color:'#94a3b8', fontSize:12 }}>— {confidence.desc}</span></p>
-                  </div>
-                  <div style={{ textAlign:'right', fontSize:11, color:'#64748b' }}>
-                    <p>Based on <span style={{ color:'#e2e8f0', fontWeight:600 }}>{rc.toLocaleString()} reports</span></p>
-                    <p>FAERS voluntary · underreporting expected</p>
-                  </div>
-                </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                   {[
                     ['Drug', p.faers_signal.drug_name],
                     ['Event', p.faers_signal.event_term],
-                    ['FAERS Reports', p.faers_signal.report_count?.toLocaleString()],
-                    ['Signal Strength', p.faers_signal.signal_strength],
-                    ['ROR', p.faers_signal.reporting_odds_ratio?.toFixed(2) ?? 'N/A'],
+                    ['FAERS Reports', p.faers_signal.report_count?.toLocaleString() ?? 'Unavailable'],
+                    ['Total Drug Reports', p.faers_signal.total_drug_reports?.toLocaleString() ?? 'Unavailable'],
+                    ['Query Status', p.faers_signal.query_status ?? (isDemo ? 'Demo dataset' : 'Unknown')],
+                    ['ROR', 'Unavailable in MVP'],
                     ['Data Source', p.faers_signal.data_source],
                   ].map(([l,v]) => (
                     <Card key={l}>
@@ -981,6 +968,7 @@ function BriefViewer({ brief, isDemo, onConfirmed }) {
                     </Card>
                   ))}
                 </div>
+                {p.faers_signal.query_note && <p style={{ fontSize:12, color:'#64748b' }}>{p.faers_signal.query_note}</p>}
               </>);
             })()}
             <SectionTitle>Signal Summary</SectionTitle>
@@ -993,7 +981,7 @@ function BriefViewer({ brief, isDemo, onConfirmed }) {
               <SectionTitle>Population Notes</SectionTitle>
               <p style={{ fontSize:13, color:'#94a3b8', lineHeight:1.75 }}>{p.population_notes}</p>
             </>}
-            <p style={{ fontSize:11, color:'#475569', fontStyle:'italic', marginTop:4 }}>FAERS data is voluntary and subject to reporting bias. ROR does not establish causality.</p>
+            <p style={{ fontSize:11, color:'#475569', fontStyle:'italic', marginTop:4 }}>FAERS reports are voluntary, can contain duplicates, and cannot establish incidence or causality. ROR is not calculated in this MVP.</p>
           </div>
         )}
 

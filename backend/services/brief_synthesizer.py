@@ -118,8 +118,8 @@ LAYER 2 — CLINICAL INTELLIGENCE:
 LAYER 3 — POPULATION INTELLIGENCE:
 - Signal summary: {population.signal_summary}
 - FAERS reports: {population.faers_signal.report_count if population.faers_signal else 'N/A'}
-- Signal strength: {population.faers_signal.signal_strength if population.faers_signal else 'N/A'}
-- ROR: {population.faers_signal.reporting_odds_ratio if population.faers_signal else 'N/A'}
+- Query status: {population.faers_signal.query_status if population.faers_signal else 'N/A'}
+- ROR: Not calculated in this MVP
 - Background context: {population.background_context}
 
 CASE ENTITIES:
